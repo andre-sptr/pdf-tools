@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" href="/favicon.ico" type="image/png">
+  <title>PDF Tools</title>
+  <meta name="description" content="Platform pengolah PDF online. Gabungkan, pisahkan, kompres, dan konversi PDF dengan aman dan gratis." />
+  <meta name="author" content="Andre Saputra" />
+  <meta name="keywords" content="PDF tools, merge PDF, split PDF, compress PDF, convert PDF" />
+
+  <meta property="og:title" content="PDF Tools" />
+  <meta property="og:description" content="Platform pengolah PDF online. Gabungkan, pisahkan, kompres, dan konversi PDF dengan aman dan gratis." />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="/favicon.ico" />
+
+  <!-- Preconnect untuk performa -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  
+  <!-- Google Fonts - Poppins dan Inter -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <style>
+    /* Custom CSS untuk tema MAN IC */
+    :root {
+      --blue-primary: #1E40AF;
+      --blue-secondary: #3B82F6;
+      --gold-accent: #FBBF24;
+      --white-clean: #FFFFFF;
+      --gray-light: #F8FAFC;
+    }
+    
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+    
+    h1, h2, h3, h4, h5, h6 {
+      font-family: 'Poppins', sans-serif;
+    }
+    
+    .gradient-bg {
+      background: linear-gradient(135deg, var(--blue-primary), var(--blue-secondary));
+    }
+    
+    /* Smooth scroll */
+    html {
+      scroll-behavior: smooth;
+    }
+    
+    /* Loading animation */
+    .loading-pulse {
+      animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% {
+        opacity: 1;
+      }
+      50% {
+        opacity: .5;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+
+</html>
