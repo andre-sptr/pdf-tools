@@ -45,7 +45,7 @@ export default function CompressPdfTool() {
     formData.append('file', file);
 
     try {
-      const response = await axios.post('https://api.pdf.flamyheart.site/api/compress-pdf', formData, {
+      const response = await axios.post('https://api-pdf.flamyheart.site/api/compress-pdf', formData, {
         responseType: 'blob',
       });
 

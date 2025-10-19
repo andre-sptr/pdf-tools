@@ -51,7 +51,7 @@ export default function ConvertToPdfTool() {
     });
 
     try {
-      const response = await axios.post('https://api.pdf.flamyheart.site/api/convert-to-pdf', formData, {
+      const response = await axios.post('https://api-pdf.flamyheart.site/api/convert-to-pdf', formData, {
         responseType: 'blob',
       });
 
