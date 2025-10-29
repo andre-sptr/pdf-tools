@@ -39,7 +39,7 @@ export default function RotatePdfTool() {
     formData.append('angle', angle);
 
     try {
-      const response = await axios.post('https://api.pdf.flamyheart.site/api/rotate-pdf', formData, {
+      const response = await axios.post('https://api-pdf.flamyheart.site/api/rotate-pdf', formData, {
         responseType: 'blob',
       });
 

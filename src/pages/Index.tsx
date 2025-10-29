@@ -185,7 +185,7 @@ export default function Index() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-blue-900 text-white py-8">
+      <footer className="bg-blue-900 text-white py-4">
         <div className="container mx-auto px-4 text-center">
           <p className="text-blue-200">
             <a 

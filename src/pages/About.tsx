@@ -122,47 +122,21 @@ export default function About() {
         </div>
       </section>
 
-      {/* School Info */}
-      {/* <section className="py-16 bg-white">
-        <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto text-center">
-            <h2 className="text-3xl font-bold text-blue-900 mb-8">
-              MAN Insan Cendekia Siak
-            </h2>
-            
-            <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-2xl p-8 mb-8">
-              <p className="text-lg text-blue-800 leading-relaxed mb-6">
-                Madrasah Aliyah Negeri Insan Cendekia Siak adalah lembaga pendidikan 
-                Islam unggulan yang berkomitmen menghasilkan generasi cendekia yang 
-                berakhlak mulia, berprestasi akademik tinggi, dan siap menghadapi 
-                tantangan global.
-              </p>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
-                <div className="space-y-2">
-                  <div className="text-2xl font-bold text-blue-700">2010</div>
-                  <div className="text-sm text-blue-600">Tahun Berdiri</div>
-                </div>
-                <div className="space-y-2">
-                  <div className="text-2xl font-bold text-blue-700">500+</div>
-                  <div className="text-sm text-blue-600">Siswa Aktif</div>
-                </div>
-                <div className="space-y-2">
-                  <div className="text-2xl font-bold text-blue-700">50+</div>
-                  <div className="text-sm text-blue-600">Tenaga Pendidik</div>
-                </div>
-              </div>
-            </div>
-
-            <p className="text-gray-600 leading-relaxed">
-              IC PDF Tools adalah bagian dari upaya digitalisasi pendidikan di MAN IC Siak, 
-              yang bertujuan memfasilitasi kebutuhan teknologi dalam proses pembelajaran 
-              dan administrasi sekolah. Platform ini dikembangkan dengan semangat 
-              <em className="text-blue-600 font-medium"> "Teknologi untuk Pendidikan, Pendidikan untuk Bangsa"</em>.
-            </p>
-          </div>
+      {/* Footer */}
+      <footer className="bg-blue-900 text-white py-4">
+        <div className="container mx-auto px-4 text-center">
+          <p className="text-blue-200">
+            <a 
+              href="https://flamyheart.site" 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="font-semibold text-white hover:underline"
+            >
+              © {new Date().getFullYear()} Andre Saputra
+            </a>.
+          </p>
         </div>
-      </section> */}
+      </footer>
     </div>
   );
 }
