@@ -47,7 +47,7 @@ export default function MergePdfTool() {
     });
 
     try {
-      const response = await axios.post('https://api.pdf.flamyheart.site/api/merge-pdf', formData, {
+      const response = await axios.post('https://api-pdf.andresptr.site/api/merge-pdf', formData, {
         responseType: 'blob',
       });
 

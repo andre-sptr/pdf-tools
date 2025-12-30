@@ -56,7 +56,7 @@ export default function SplitPdfTool() {
     formData.append('ranges', ranges);
 
     try {
-      const response = await axios.post('https://api.pdf.flamyheart.site/api/split-pdf', formData, {
+      const response = await axios.post('https://api-pdf.andresptr.site/api/split-pdf', formData, {
         responseType: 'blob',
       });
 
