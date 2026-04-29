@@ -17,6 +17,7 @@ export default function PdfToWordTool() {
     uploadProgress,
     addFiles,
     removeFile,
+    processFiles,
   } = usePdfTool({
     endpoint: '/pdf-to-word',
     outputFilename: 'Hasil-PDF-ke-Word.docx',

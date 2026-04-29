@@ -5,13 +5,10 @@ import { Progress } from '@/components/ui/progress';
 import Dropzone from '@/components/Dropzone';
 import { X, Loader2, Image } from 'lucide-react';
 import { usePdfTool } from '@/hooks/usePdfTool';
-import { useToast } from '@/components/ui/use-toast';
 
 const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png'];
 
 export default function ConvertToPdfTool() {
-  const { toast } = useToast();
-
   const {
     files,
     isProcessing,
@@ -28,24 +25,8 @@ export default function ConvertToPdfTool() {
   });
 
   const handleAddFiles = useCallback((newFiles: FileList | File[] | null) => {
-    if (!newFiles || newFiles.length === 0) return;
-
-    const fileArray = Array.from(newFiles);
-    const validFiles = fileArray.filter(file => ACCEPTED_IMAGE_TYPES.includes(file.type));
-    const invalidCount = fileArray.length - validFiles.length;
-
-    if (invalidCount > 0) {
-      toast({
-        title: 'File tidak valid',
-        description: `${invalidCount} file bukan JPG/PNG dan telah diabaikan.`,
-        variant: 'destructive',
-      });
-    }
-
-    if (validFiles.length > 0) {
-      addFiles(validFiles);
-    }
-  }, [addFiles, toast]);
+    addFiles(newFiles);
+  }, [addFiles]);
 
   const processingText = `Mengonversi... ${uploadProgress}%`;
 

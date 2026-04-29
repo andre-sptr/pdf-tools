@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import type { AxiosProgressEvent } from 'axios';
 import { useToast } from '@/components/ui/use-toast';
 import { postFile, downloadBlob, type ApiResponse, type UploadOptions } from '@/lib/api';
@@ -36,6 +36,15 @@ export function usePdfTool({
   const [uploadProgress, setUploadProgress] = useState(0);
   const abortControllerRef = useRef<AbortController | null>(null);
   const { toast } = useToast();
+
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+    };
+  }, []);
 
   const addFiles = useCallback((newFiles: FileList | File[] | null) => {
     if (!newFiles || newFiles.length === 0) return;

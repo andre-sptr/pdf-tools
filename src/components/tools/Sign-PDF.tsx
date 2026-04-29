@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
@@ -14,6 +14,7 @@ export default function SignPdfTool() {
   const [signatureText, setSignatureText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const { toast } = useToast();
 
   const {
@@ -26,6 +27,15 @@ export default function SignPdfTool() {
     maxFiles: 1,
     minFiles: 1,
   });
+
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+    };
+  }, []);
 
   const handleProcess = useCallback(async () => {
     if (!files.length || !signatureText.trim()) {
@@ -40,6 +50,11 @@ export default function SignPdfTool() {
     setIsProcessing(true);
     setUploadProgress(0);
 
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+
     const formData = new FormData();
     formData.append('files[0]', files[0]);
     formData.append('signature', signatureText);
@@ -48,12 +63,13 @@ export default function SignPdfTool() {
       if (event.total) {
         setUploadProgress(Math.round((event.loaded / event.total) * 100));
       } else {
-        setUploadProgress(-1);
+        setUploadProgress(0);
       }
     };
 
     const result = await postFile('/sign-pdf', formData, {
       onProgress: handleProgress,
+      signal: abortControllerRef.current.signal,
     });
 
     if (result.error) {
@@ -74,6 +90,7 @@ export default function SignPdfTool() {
 
     setIsProcessing(false);
     setUploadProgress(0);
+    abortControllerRef.current = null;
   }, [files, signatureText, removeFile, toast]);
 
   const processingText = `Menandatangani... ${uploadProgress}%`;
