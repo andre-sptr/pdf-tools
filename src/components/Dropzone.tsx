@@ -17,6 +17,8 @@ const isValidFileType = (file: File, accept: string): boolean => {
   const extensions = accept.split(',').filter(ext => ext.startsWith('.'));
   const mimeTypes = accept.split(',').filter(ext => !ext.startsWith('.'));
 
+  if (extensions.length === 0 && mimeTypes.length === 0) return false;
+
   const fileName = file.name.toLowerCase();
   const fileType = file.type.toLowerCase();
 
@@ -30,7 +32,7 @@ const isValidFileType = (file: File, accept: string): boolean => {
     if (fileType === mime_clean || fileType === `${mime_clean}/*`) return true;
   }
 
-  return extensions.length === 0 && mimeTypes.length === 0;
+  return false;
 };
 
 const filterValidFiles = (files: FileList | File[], accept: string, maxFiles: number): File[] => {
@@ -91,12 +93,12 @@ export default function Dropzone({
       const { files } = e.target;
       if (files && files.length > 0) {
         const validFiles = filterValidFiles(files, accept, maxFiles);
+        e.target.value = '';
         if (validFiles.length > 0) {
           const dataTransfer = new DataTransfer();
           validFiles.forEach((file) => dataTransfer.items.add(file));
           onFilesSelected(dataTransfer.files);
         }
-        e.target.value = '';
       }
     },
     [onFilesSelected, accept, maxFiles]

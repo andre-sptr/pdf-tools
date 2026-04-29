@@ -145,7 +145,14 @@ app.post('/api/split-pdf', upload.single('files'), async (req, res) => {
       let pageIndices = [];
 
       if (range.includes('-')) {
-        const [start, end] = range.split('-').map(num => parseInt(num));
+        const parts = range.split('-');
+        // Validate format: harus ada 2 bagian
+        if (parts.length !== 2) {
+          console.warn(`Format rentang tidak valid: ${range}`);
+          continue;
+        }
+        const start = parseInt(parts[0], 10);
+        const end = parseInt(parts[1], 10);
         if (isNaN(start) || isNaN(end) || start < 1 || end > totalPages || start > end) {
           console.warn(`Rentang tidak valid diabaikan: ${range}`);
           continue;
@@ -155,7 +162,7 @@ app.post('/api/split-pdf', upload.single('files'), async (req, res) => {
           pageIndices.push(i - 1);
         }
       } else {
-        const pageNum = parseInt(range);
+        const pageNum = parseInt(range, 10);
         if (isNaN(pageNum) || pageNum < 1 || pageNum > totalPages) {
           console.warn(`Halaman tidak valid diabaikan: ${range}`);
           continue;
@@ -571,6 +578,10 @@ app.post('/api/rotate-pdf', upload.single('files'), async (req, res) => {
 
   const angle = parseInt(req.body.angle, 10);
 
+  if (isNaN(angle)) {
+    return res.status(400).send('Derajat putaran tidak valid.');
+  }
+
   if (![90, 180, 270].includes(angle)) {
     return res.status(400).send('Derajat putaran harus 90, 180, atau 270.');
   }
@@ -631,9 +642,15 @@ app.post('/api/edit-pdf', upload.single('files'), async (req, res) => {
 
       if (pageIndex < pages.length && pageIndex >= 0 && text) {
         const page = pages[pageIndex];
+        const { width, height } = page.getSize();
+
+        // Bounds check - clamp coordinates to page dimensions
+        const safeX = Math.max(0, Math.min(x, width - 50));
+        const safeY = Math.max(0, Math.min(y, height - 20));
+
         page.drawText(text, {
-          x: x,
-          y: page.getHeight() - y,
+          x: safeX,
+          y: page.getHeight() - safeY,
           size: size,
           font: font,
           color: rgb(0, 0, 0),

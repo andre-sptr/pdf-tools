@@ -35,6 +35,7 @@ export function usePdfTool({
   const [isProcessing, setIsProcessing] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const processingRef = useRef(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -51,6 +52,7 @@ export function usePdfTool({
 
     const fileArray = Array.from(newFiles);
     let validFiles = fileArray.filter(file => {
+      if (!file.name || file.name.trim() === '') return false;
       if (!allowedTypes) {
         return file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
       }
@@ -58,70 +60,85 @@ export function usePdfTool({
         allowedTypes.some(ext => file.name.toLowerCase().endsWith(ext.toLowerCase()));
     });
 
-    const existingNames = new Set(files.map(f => f.name));
-    const duplicateCount = validFiles.filter(f => existingNames.has(f.name)).length;
-    if (duplicateCount > 0) {
-      toast({
-        title: 'File duplikat',
-        description: `${duplicateCount} file sudah ada dalam daftar.`,
-        variant: 'destructive',
-      });
-      validFiles = validFiles.filter(f => !existingNames.has(f.name));
-    }
-
-    if (maxFileSize) {
-      const tooLarge = validFiles.filter(f => f.size > maxFileSize);
-      if (tooLarge.length > 0) {
-        toast({
-          title: 'File terlalu besar',
-          description: `${tooLarge.length} file melebihi batas ukuran.`,
-          variant: 'destructive',
-        });
-        validFiles = validFiles.filter(f => f.size <= maxFileSize);
-      }
-    }
-
-    const invalidCount = fileArray.length - validFiles.length;
-
-    if (invalidCount > 0) {
-      toast({
-        title: 'File tidak valid',
-        description: `${invalidCount} file memiliki format yang tidak didukung.`,
-        variant: 'destructive',
-      });
-    }
-
-    if (validFiles.length === 0) {
-      toast({
-        title: 'File tidak valid',
-        description: 'Tidak ada file valid yang dipilih.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
     setFiles((prev) => {
-      const combined = [...prev, ...validFiles];
+      const existingNames = new Set(prev.map(f => f.name));
+      const newWithoutDuplicates = validFiles.filter(f => !existingNames.has(f.name));
+
+      const duplicateCount = validFiles.length - newWithoutDuplicates.length;
+      if (duplicateCount > 0) {
+        setTimeout(() => {
+          toast({
+            title: 'File duplikat',
+            description: `${duplicateCount} file sudah ada dalam daftar.`,
+            variant: 'destructive',
+          });
+        }, 0);
+      }
+
+      if (maxFileSize) {
+        const tooLarge = newWithoutDuplicates.filter(f => f.size > maxFileSize);
+        if (tooLarge.length > 0) {
+          setTimeout(() => {
+            toast({
+              title: 'File terlalu besar',
+              description: `${tooLarge.length} file melebihi batas ukuran.`,
+              variant: 'destructive',
+            });
+          }, 0);
+        }
+      }
+
+      const validAfterSize = maxFileSize
+        ? newWithoutDuplicates.filter(f => f.size <= maxFileSize)
+        : newWithoutDuplicates;
+
+      const invalidCount = fileArray.length - validAfterSize.length;
+
+      if (invalidCount > 0) {
+        setTimeout(() => {
+          toast({
+            title: 'File tidak valid',
+            description: `${invalidCount} file memiliki format yang tidak didukung.`,
+            variant: 'destructive',
+          });
+        }, 0);
+      }
+
+      if (validAfterSize.length === 0) {
+        setTimeout(() => {
+          toast({
+            title: 'File tidak valid',
+            description: 'Tidak ada file valid yang dipilih.',
+            variant: 'destructive',
+          });
+        }, 0);
+        return prev;
+      }
+
+      const combined = [...prev, ...validAfterSize];
       if (combined.length > maxFiles) {
-        toast({
-          title: 'Terlalu banyak file',
-          description: `Maksimal ${maxFiles} file diperbolehkan.`,
-          variant: 'destructive',
-        });
+        setTimeout(() => {
+          toast({
+            title: 'Terlalu banyak file',
+            description: `Maksimal ${maxFiles} file diperbolehkan.`,
+            variant: 'destructive',
+          });
+        }, 0);
         return combined.slice(0, maxFiles);
       }
       return combined;
     });
-  }, [maxFiles, toast]);
+  }, [maxFiles, maxFileSize, allowedTypes, toast]);
 
   const removeFile = useCallback((index: number) => {
     setFiles((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
   const reorderFiles = useCallback((fromIndex: number, toIndex: number) => {
-    if (fromIndex === toIndex) return;
+    if (fromIndex < 0 || toIndex < 0) return;
 
     setFiles((prev) => {
+      if (fromIndex >= prev.length || toIndex >= prev.length) return prev;
       const newFiles = [...prev];
       const [moved] = newFiles.splice(fromIndex, 1);
       newFiles.splice(toIndex, 0, moved);
@@ -130,7 +147,7 @@ export function usePdfTool({
   }, []);
 
   const processFiles = useCallback(async () => {
-    if (isProcessing) {
+    if (processingRef.current) {
       toast({
         title: 'Sedang memproses',
         description: 'Mohon tunggu hingga proses selesai.',
@@ -149,6 +166,7 @@ export function usePdfTool({
       return;
     }
 
+    processingRef.current = true;
     setIsProcessing(true);
     setUploadProgress(0);
 
@@ -176,27 +194,30 @@ export function usePdfTool({
       signal: abortControllerRef.current.signal,
     };
 
-    const result = await postFile(endpoint, formData, options);
+    try {
+      const result = await postFile(endpoint, formData, options);
 
-    if (result.error) {
-      toast({
-        title: 'Terjadi kesalahan',
-        description: result.error.message,
-        variant: 'destructive',
-      });
-    } else if (result.data) {
-      downloadBlob(result.data as Blob, outputFilename);
-      toast({
-        title: 'Berhasil!',
-        description: 'File telah diproses dan diunduh.',
-      });
-      setFiles([]);
+      if (result.error) {
+        toast({
+          title: 'Terjadi kesalahan',
+          description: result.error.message,
+          variant: 'destructive',
+        });
+      } else if (result.data) {
+        downloadBlob(result.data as Blob, outputFilename);
+        toast({
+          title: 'Berhasil!',
+          description: 'File telah diproses dan diunduh.',
+        });
+        setFiles([]);
+      }
+    } finally {
+      setIsProcessing(false);
+      setUploadProgress(0);
+      abortControllerRef.current = null;
+      processingRef.current = false;
     }
-
-    setIsProcessing(false);
-    setUploadProgress(0);
-    abortControllerRef.current = null;
-  }, [files, endpoint, outputFilename, minFiles, toast, isProcessing]);
+  }, [files, endpoint, outputFilename, minFiles, toast]);
 
   const reset = useCallback(() => {
     setFiles([]);

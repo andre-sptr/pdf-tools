@@ -77,6 +77,7 @@ export function downloadBlob(blob: Blob, filename: string): void {
 }
 
 export function validatePdfFile(file: File): boolean {
+  if (!file.name || file.name.trim() === '') return false;
   return file.type === 'application/pdf' ||
          file.name.toLowerCase().endsWith('.pdf');
 }
@@ -87,11 +88,12 @@ export function validateFile(file: File, allowedTypes?: string[]): boolean {
          allowedTypes.some(type => file.name.toLowerCase().endsWith(type.toLowerCase()));
 }
 
-export function validatePdfFiles(files: FileList | File[]): { valid: File[]; invalid: number } {
+export function validatePdfFiles(files: FileList | File[]): { valid: File[]; invalid: number; invalidFiles: string[] } {
   const fileArray = Array.from(files);
   const valid = fileArray.filter(validatePdfFile);
+  const invalidFiles = fileArray.filter(f => !validatePdfFile(f)).map(f => f.name);
   const invalid = fileArray.length - valid.length;
-  return { valid, invalid };
+  return { valid, invalid, invalidFiles };
 }
 
 export default apiClient;
