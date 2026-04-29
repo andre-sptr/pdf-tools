@@ -39,10 +39,15 @@ export default function SplitPdfTool() {
     if (!files.length) return;
 
     const formData = new FormData();
-    formData.append('file', files[0]);
+    formData.append('files[0]', files[0]);
     formData.append('ranges', ranges);
 
-    const result = await postFile('/split-pdf', formData);
+    const result = await postFile('/split-pdf', formData, {
+      onProgress: (event) => {
+        if (event.total) {
+        }
+      },
+    });
 
     if (result.error) {
       toast({

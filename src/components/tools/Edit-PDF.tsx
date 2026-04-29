@@ -57,7 +57,7 @@ export default function EditPdfTool() {
     setIsProcessing(true);
 
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('files[0]', file);
     formData.append('elements', JSON.stringify(textElements));
 
     try {

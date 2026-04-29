@@ -20,9 +20,6 @@ export interface ApiResponse<T = unknown> {
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
   timeout: 120000,
-  headers: {
-    'Content-Type': 'multipart/form-data',
-  },
 });
 
 export async function postFile<T = unknown>(
@@ -80,7 +77,8 @@ export function downloadBlob(blob: Blob, filename: string): void {
 }
 
 export function validatePdfFile(file: File): boolean {
-  return file.type === 'application/pdf';
+  return file.type === 'application/pdf' ||
+         file.name.toLowerCase().endsWith('.pdf');
 }
 
 export function validateFile(file: File, allowedTypes?: string[]): boolean {

@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import type { AxiosProgressEvent } from 'axios';
 import Dropzone from '@/components/Dropzone';
 import { FileText, X, Loader2 } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -41,15 +42,19 @@ export default function RotatePdfTool() {
     setUploadProgress(0);
 
     const formData = new FormData();
-    formData.append('file', files[0]);
+    formData.append('files[0]', files[0]);
     formData.append('angle', angle);
 
+    const handleProgress = (event: AxiosProgressEvent) => {
+      if (event.total) {
+        setUploadProgress(Math.round((event.loaded / event.total) * 100));
+      } else {
+        setUploadProgress(-1);
+      }
+    };
+
     const result = await postFile('/rotate-pdf', formData, {
-      onProgress: (event) => {
-        if (event.total && event.loaded) {
-          setUploadProgress(Math.round((event.loaded / event.total) * 100));
-        }
-      },
+      onProgress: handleProgress,
     });
 
     if (result.error) {

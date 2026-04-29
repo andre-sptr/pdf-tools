@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import type { AxiosProgressEvent } from 'axios';
 import Dropzone from '@/components/Dropzone';
 import { FileText, X, ArrowUp, ArrowDown, Loader2 } from 'lucide-react';
 import { postFile, downloadBlob } from '@/lib/api';
@@ -60,16 +61,20 @@ export default function OrganizePdfTool() {
     setUploadProgress(0);
 
     const formData = new FormData();
-    files.forEach((file) => {
-      formData.append('files', file);
+    files.forEach((file, index) => {
+      formData.append(`files[${index}]`, file);
     });
 
+    const handleProgress = (event: AxiosProgressEvent) => {
+      if (event.total) {
+        setUploadProgress(Math.round((event.loaded / event.total) * 100));
+      } else {
+        setUploadProgress(-1);
+      }
+    };
+
     const result = await postFile('/organize-pdf', formData, {
-      onProgress: (event) => {
-        if (event.total && event.loaded) {
-          setUploadProgress(Math.round((event.loaded / event.total) * 100));
-        }
-      },
+      onProgress: handleProgress,
     });
 
     if (result.error) {

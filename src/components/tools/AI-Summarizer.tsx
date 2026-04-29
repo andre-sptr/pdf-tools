@@ -1,12 +1,12 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import type { AxiosProgressEvent } from 'axios';
 import Dropzone from '@/components/Dropzone';
 import { FileText, X, Loader2, Sparkles } from 'lucide-react';
-import { postFile, downloadBlob } from '@/lib/api';
-import { validatePdfFile } from '@/lib/api';
+import { postFile, downloadBlob, validatePdfFile } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
 
 export default function AiSummarizerTool() {
@@ -14,7 +14,16 @@ export default function AiSummarizerTool() {
   const [files, setFiles] = useState<File[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const { toast } = useToast();
+
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   const addFiles = useCallback((newFiles: FileList | File[] | null) => {
     if (!newFiles || newFiles.length === 0) return;
@@ -59,16 +68,26 @@ export default function AiSummarizerTool() {
     setIsProcessing(true);
     setUploadProgress(0);
 
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+
     const formData = new FormData();
-    formData.append('files', files[0]);
+    formData.append('files[0]', files[0]);
     formData.append('summaryLength', summaryLength);
 
+    const handleProgress = (event: AxiosProgressEvent) => {
+      if (event.total) {
+        setUploadProgress(Math.round((event.loaded / event.total) * 100));
+      } else {
+        setUploadProgress(-1);
+      }
+    };
+
     const result = await postFile('/ai-summarize', formData, {
-      onProgress: (event) => {
-        if (event.total && event.loaded) {
-          setUploadProgress(Math.round((event.loaded / event.total) * 100));
-        }
-      },
+      onProgress: handleProgress,
+      signal: abortControllerRef.current.signal,
     });
 
     if (result.error) {
@@ -88,6 +107,7 @@ export default function AiSummarizerTool() {
 
     setIsProcessing(false);
     setUploadProgress(0);
+    abortControllerRef.current = null;
   }, [files, summaryLength, toast]);
 
   const processingText = `Membuat ringkasan AI... ${uploadProgress}%`;

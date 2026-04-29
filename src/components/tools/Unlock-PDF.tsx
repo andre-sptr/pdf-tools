@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
+import type { AxiosProgressEvent } from 'axios';
 import Dropzone from '@/components/Dropzone';
 import { FileText, X, Loader2, Lock, AlertTriangle } from 'lucide-react';
 import { usePdfTool } from '@/hooks/usePdfTool';
@@ -40,17 +41,21 @@ export default function UnlockPdfTool() {
     setUploadProgress(0);
 
     const formData = new FormData();
-    formData.append('file', files[0]);
+    formData.append('files[0]', files[0]);
     if (password) {
       formData.append('password', password);
     }
 
+    const handleProgress = (event: AxiosProgressEvent) => {
+      if (event.total) {
+        setUploadProgress(Math.round((event.loaded / event.total) * 100));
+      } else {
+        setUploadProgress(-1);
+      }
+    };
+
     const result = await postFile('/unlock-pdf', formData, {
-      onProgress: (event) => {
-        if (event.total && event.loaded) {
-          setUploadProgress(Math.round((event.loaded / event.total) * 100));
-        }
-      },
+      onProgress: handleProgress,
     });
 
     if (result.error) {

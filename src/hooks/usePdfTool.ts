@@ -8,6 +8,7 @@ export interface UsePdfToolOptions {
   outputFilename: string;
   maxFiles?: number;
   minFiles?: number;
+  maxFileSize?: number;
   allowedTypes?: string[];
 }
 
@@ -27,6 +28,7 @@ export function usePdfTool({
   outputFilename,
   maxFiles = 10,
   minFiles = 1,
+  maxFileSize,
   allowedTypes,
 }: UsePdfToolOptions): UsePdfToolReturn {
   const [files, setFiles] = useState<File[]>([]);
@@ -39,11 +41,36 @@ export function usePdfTool({
     if (!newFiles || newFiles.length === 0) return;
 
     const fileArray = Array.from(newFiles);
-    const validFiles = fileArray.filter(file => {
-      if (!allowedTypes) return file.type === 'application/pdf';
+    let validFiles = fileArray.filter(file => {
+      if (!allowedTypes) {
+        return file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+      }
       return allowedTypes.includes(file.type) ||
         allowedTypes.some(ext => file.name.toLowerCase().endsWith(ext.toLowerCase()));
     });
+
+    const existingNames = new Set(files.map(f => f.name));
+    const duplicateCount = validFiles.filter(f => existingNames.has(f.name)).length;
+    if (duplicateCount > 0) {
+      toast({
+        title: 'File duplikat',
+        description: `${duplicateCount} file sudah ada dalam daftar.`,
+        variant: 'destructive',
+      });
+      validFiles = validFiles.filter(f => !existingNames.has(f.name));
+    }
+
+    if (maxFileSize) {
+      const tooLarge = validFiles.filter(f => f.size > maxFileSize);
+      if (tooLarge.length > 0) {
+        toast({
+          title: 'File terlalu besar',
+          description: `${tooLarge.length} file melebihi batas ukuran.`,
+          variant: 'destructive',
+        });
+        validFiles = validFiles.filter(f => f.size <= maxFileSize);
+      }
+    }
 
     const invalidCount = fileArray.length - validFiles.length;
 
@@ -106,17 +133,23 @@ export function usePdfTool({
 
     setIsProcessing(true);
     setUploadProgress(0);
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
     abortControllerRef.current = new AbortController();
 
     const formData = new FormData();
-    files.forEach((file) => {
-      formData.append('files', file);
+    files.forEach((file, index) => {
+      formData.append(`files[${index}]`, file);
     });
 
     const handleProgress = (event: AxiosProgressEvent) => {
-      if (event.total && event.loaded) {
+      if (event.total) {
         const progress = Math.round((event.loaded / event.total) * 100);
         setUploadProgress(progress);
+      } else {
+        setUploadProgress(-1);
       }
     };
 
