@@ -2,7 +2,6 @@ import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import Dropzone from '@/components/Dropzone';
 import { FileText, X, Type, Image as ImageIcon, Square, Loader2, Save } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
@@ -177,7 +176,7 @@ export default function EditPdfTool() {
             )}
 
             <div className="text-xs text-gray-500 p-2 bg-blue-50 rounded">
-              Catatan: Fitur edit PDF tersedia untuk menambahkan teks sederhana. Untuk fitur lebih lengkap, gunakan versi premium.
+              Catatan: Fitur edit PDF tersedia untuk menambahkan teks sederhana.
             </div>
           </div>
         )}
