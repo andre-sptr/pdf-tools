@@ -1,6 +1,6 @@
 import axios, { AxiosError, type AxiosProgressEvent } from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://api-pdf.andresptr.site/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3004/api';
 
 export interface ApiError {
   message: string;
@@ -81,6 +81,12 @@ export function downloadBlob(blob: Blob, filename: string): void {
 
 export function validatePdfFile(file: File): boolean {
   return file.type === 'application/pdf';
+}
+
+export function validateFile(file: File, allowedTypes?: string[]): boolean {
+  if (!allowedTypes || allowedTypes.length === 0) return true;
+  return allowedTypes.includes(file.type) || 
+         allowedTypes.some(type => file.name.toLowerCase().endsWith(type.toLowerCase()));
 }
 
 export function validatePdfFiles(files: FileList | File[]): { valid: File[]; invalid: number } {

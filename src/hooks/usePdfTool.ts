@@ -8,6 +8,7 @@ export interface UsePdfToolOptions {
   outputFilename: string;
   maxFiles?: number;
   minFiles?: number;
+  allowedTypes?: string[];
 }
 
 export interface UsePdfToolReturn {
@@ -26,6 +27,7 @@ export function usePdfTool({
   outputFilename,
   maxFiles = 10,
   minFiles = 1,
+  allowedTypes,
 }: UsePdfToolOptions): UsePdfToolReturn {
   const [files, setFiles] = useState<File[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -37,13 +39,18 @@ export function usePdfTool({
     if (!newFiles || newFiles.length === 0) return;
 
     const fileArray = Array.from(newFiles);
-    const validFiles = fileArray.filter(validatePdfFile);
+    const validFiles = fileArray.filter(file => {
+      if (!allowedTypes) return file.type === 'application/pdf';
+      return allowedTypes.includes(file.type) ||
+        allowedTypes.some(ext => file.name.toLowerCase().endsWith(ext.toLowerCase()));
+    });
+
     const invalidCount = fileArray.length - validFiles.length;
 
     if (invalidCount > 0) {
       toast({
         title: 'File tidak valid',
-        description: `${invalidCount} file bukan PDF dan telah diabaikan.`,
+        description: `${invalidCount} file memiliki format yang tidak didukung.`,
         variant: 'destructive',
       });
     }
@@ -51,7 +58,7 @@ export function usePdfTool({
     if (validFiles.length === 0) {
       toast({
         title: 'File tidak valid',
-        description: 'Tidak ada file PDF yang dipilih.',
+        description: 'Tidak ada file valid yang dipilih.',
         variant: 'destructive',
       });
       return;

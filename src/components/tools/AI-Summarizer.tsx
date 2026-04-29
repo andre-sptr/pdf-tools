@@ -60,7 +60,7 @@ export default function AiSummarizerTool() {
     setUploadProgress(0);
 
     const formData = new FormData();
-    formData.append('file', files[0]);
+    formData.append('files', files[0]);
     formData.append('summaryLength', summaryLength);
 
     const result = await postFile('/ai-summarize', formData, {

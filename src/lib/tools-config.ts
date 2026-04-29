@@ -205,13 +205,6 @@ export const tools: Tool[] = [
 
   // ===================== KEAMANAN =====================
   {
-    slug: 'protect-pdf',
-    title: 'Proteksi PDF',
-    description: 'Tambahkan password untuk melindungi dokumen PDF Anda.',
-    icon: Lock,
-    category: 'security',
-  },
-  {
     slug: 'unlock-pdf',
     title: 'Buka Kunci PDF',
     description: 'Hapus proteksi password dari file PDF yang terkunci.',

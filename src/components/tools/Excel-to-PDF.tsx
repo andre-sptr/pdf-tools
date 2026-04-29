@@ -30,10 +30,16 @@ export default function ExcelToPdfTool() {
     removeFile,
     processFiles,
   } = usePdfTool({
-    endpoint: '/excel-to-pdf',
+    endpoint: '/convert-office-to-pdf',
     outputFilename: 'Hasil-Excel-ke-PDFTools.pdf',
     maxFiles: 10,
     minFiles: 1,
+    allowedTypes: [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+      '.xls',
+      '.xlsx'
+    ],
   });
 
   const processingText = `Mengonversi... ${uploadProgress}%`;

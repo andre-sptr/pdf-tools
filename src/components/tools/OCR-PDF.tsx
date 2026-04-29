@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import Dropzone from '@/components/Dropzone';
-import { FileText, X, Loader2, FileType } from 'lucide-react';
+import { FileText, X, Loader2, FileType, Sparkles } from 'lucide-react';
 import { usePdfTool } from '@/hooks/usePdfTool';
 
 export default function OcrPdfTool() {
@@ -80,8 +80,8 @@ export default function OcrPdfTool() {
               </>
             ) : (
               <>
-                <FileType className="mr-2 h-5 w-5" />
-                Ekstrak Teks Sekarang
+                <Sparkles className="mr-2 h-5 w-5" />
+                Ekstrak Teks dengan AI
               </>
             )}
           </Button>

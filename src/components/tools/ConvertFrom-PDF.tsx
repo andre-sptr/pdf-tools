@@ -1,71 +1,25 @@
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import Dropzone from '@/components/Dropzone';
 import { FileText, X, Loader2 } from 'lucide-react';
 import { usePdfTool } from '@/hooks/usePdfTool';
-import { postFile, downloadBlob, validatePdfFile } from '@/lib/api';
-import { useToast } from '@/components/ui/use-toast';
 
 export default function ConvertFromPdfTool() {
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const { toast } = useToast();
-
   const {
     files,
+    isProcessing,
+    uploadProgress,
     addFiles,
     removeFile,
+    processFiles,
   } = usePdfTool({
     endpoint: '/convert-from-pdf',
     outputFilename: 'Hasil-Konversi-JPG.zip',
     maxFiles: 1,
     minFiles: 1,
   });
-
-  const handleConvertFromPdf = useCallback(async () => {
-    if (files.length === 0) {
-      toast({
-        title: 'File tidak ditemukan',
-        description: 'Silakan pilih 1 file PDF untuk dikonversi.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setIsProcessing(true);
-    setUploadProgress(0);
-
-    const formData = new FormData();
-    formData.append('file', files[0]);
-
-    const result = await postFile('/convert-from-pdf', formData, {
-      onProgress: (event) => {
-        if (event.total && event.loaded) {
-          setUploadProgress(Math.round((event.loaded / event.total) * 100));
-        }
-      },
-    });
-
-    if (result.error) {
-      toast({
-        title: 'Terjadi kesalahan',
-        description: result.error.message,
-        variant: 'destructive',
-      });
-    } else if (result.data) {
-      downloadBlob(result.data as Blob, 'Hasil-Konversi-JPG.zip');
-      toast({
-        title: 'Berhasil!',
-        description: 'File PDF telah dikonversi ke JPG dan diunduh sebagai ZIP.',
-      });
-      removeFile(0);
-    }
-
-    setIsProcessing(false);
-    setUploadProgress(0);
-  }, [files, removeFile, toast]);
 
   const processingText = `Mengonversi... ${uploadProgress}%`;
 
@@ -116,7 +70,7 @@ export default function ConvertFromPdfTool() {
         <div className="mt-8">
           <Button
             className="w-full bg-gradient-to-r from-blue-600 to-blue-500 text-lg py-6"
-            onClick={handleConvertFromPdf}
+            onClick={processFiles}
             disabled={isProcessing || files.length === 0}
           >
             {isProcessing ? (

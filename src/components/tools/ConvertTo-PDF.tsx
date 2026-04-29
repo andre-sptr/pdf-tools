@@ -1,30 +1,37 @@
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import Dropzone from '@/components/Dropzone';
 import { X, Loader2, Image } from 'lucide-react';
 import { usePdfTool } from '@/hooks/usePdfTool';
-import { postFile, downloadBlob } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
 
 const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png'];
 
-function validateImageFile(file: File): boolean {
-  return ACCEPTED_IMAGE_TYPES.includes(file.type);
-}
-
 export default function ConvertToPdfTool() {
-  const [files, setFiles] = useState<File[]>([]);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
   const { toast } = useToast();
 
-  const addFiles = useCallback((newFiles: FileList | File[] | null) => {
+  const {
+    files,
+    isProcessing,
+    uploadProgress,
+    addFiles,
+    removeFile,
+    processFiles,
+  } = usePdfTool({
+    endpoint: '/convert-to-pdf',
+    outputFilename: 'Hasil-Konversi-Gambar-ke-PDF.pdf',
+    maxFiles: 50,
+    minFiles: 1,
+    allowedTypes: ACCEPTED_IMAGE_TYPES,
+  });
+
+  const handleAddFiles = useCallback((newFiles: FileList | File[] | null) => {
     if (!newFiles || newFiles.length === 0) return;
 
     const fileArray = Array.from(newFiles);
-    const validFiles = fileArray.filter(validateImageFile);
+    const validFiles = fileArray.filter(file => ACCEPTED_IMAGE_TYPES.includes(file.type));
     const invalidCount = fileArray.length - validFiles.length;
 
     if (invalidCount > 0) {
@@ -36,58 +43,9 @@ export default function ConvertToPdfTool() {
     }
 
     if (validFiles.length > 0) {
-      setFiles((prev) => [...prev, ...validFiles]);
+      addFiles(validFiles);
     }
-  }, [toast]);
-
-  const removeFile = useCallback((index: number) => {
-    setFiles((prev) => prev.filter((_, i) => i !== index));
-  }, []);
-
-  const handleConvertToPdf = useCallback(async () => {
-    if (files.length === 0) {
-      toast({
-        title: 'File tidak ditemukan',
-        description: 'Silakan pilih minimal 1 file gambar (JPG/PNG).',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setIsProcessing(true);
-    setUploadProgress(0);
-
-    const formData = new FormData();
-    files.forEach((file) => {
-      formData.append('files', file);
-    });
-
-    const result = await postFile('/convert-to-pdf', formData, {
-      onProgress: (event) => {
-        if (event.total && event.loaded) {
-          setUploadProgress(Math.round((event.loaded / event.total) * 100));
-        }
-      },
-    });
-
-    if (result.error) {
-      toast({
-        title: 'Terjadi kesalahan',
-        description: result.error.message,
-        variant: 'destructive',
-      });
-    } else if (result.data) {
-      downloadBlob(result.data as Blob, 'Hasil-Konversi-PDFTools.pdf');
-      toast({
-        title: 'Berhasil!',
-        description: 'File gambar telah dikonversi ke PDF.',
-      });
-      setFiles([]);
-    }
-
-    setIsProcessing(false);
-    setUploadProgress(0);
-  }, [files, toast]);
+  }, [addFiles, toast]);
 
   const processingText = `Mengonversi... ${uploadProgress}%`;
 
@@ -98,7 +56,7 @@ export default function ConvertToPdfTool() {
 
         {!files.length && (
           <Dropzone
-            onFilesSelected={addFiles}
+            onFilesSelected={handleAddFiles}
             accept="image/jpeg,image/png"
             multiple
             maxFiles={50}
@@ -144,7 +102,7 @@ export default function ConvertToPdfTool() {
         <div className="mt-8">
           <Button
             className="w-full bg-gradient-to-r from-blue-600 to-blue-500 text-lg py-6"
-            onClick={handleConvertToPdf}
+            onClick={processFiles}
             disabled={isProcessing || files.length === 0}
           >
             {isProcessing ? (

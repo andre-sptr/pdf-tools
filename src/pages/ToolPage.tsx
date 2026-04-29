@@ -5,9 +5,6 @@ import { ArrowLeft, FileText } from 'lucide-react';
 import { tools } from '@/lib/tools-config';
 import { type ComponentType, JSX, lazy, Suspense } from 'react';
 
-// ========================================================================
-// IMPORT KOMPONEN TOOL
-// ========================================================================
 import MergePdfTool from '@/components/tools/Merge-PDF';
 import SplitPdfTool from '@/components/tools/Split-PDF';
 import CompressPdfTool from '@/components/tools/Compress-PDF';
@@ -26,7 +23,6 @@ import ConvertToPdfaTool from '@/components/tools/ConvertTo-PDFA';
 import PdfToWordTool from '@/components/tools/PDF-to-Word';
 import PdfToExcelTool from '@/components/tools/PDF-to-Excel';
 import PdfToPptTool from '@/components/tools/PDF-to-PowerPoint';
-import ProtectPdfTool from '@/components/tools/Protect-PDF';
 import UnlockPdfTool from '@/components/tools/Unlock-PDF';
 import SignPdfTool from '@/components/tools/Sign-PDF';
 import OcrPdfTool from '@/components/tools/OCR-PDF';
@@ -61,7 +57,7 @@ const toolComponents: Record<string, JSX.Element> = {
   'pdf-to-word': <PdfToWordTool />,
   'pdf-to-excel': <PdfToExcelTool />,
   'pdf-to-ppt': <PdfToPptTool />,
-  'protect-pdf': <ProtectPdfTool />,
+
   'unlock-pdf': <UnlockPdfTool />,
   'sign-pdf': <SignPdfTool />,
   'ocr-pdf': <OcrPdfTool />,

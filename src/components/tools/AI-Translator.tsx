@@ -73,7 +73,7 @@ export default function AiTranslatorTool() {
     setUploadProgress(0);
 
     const formData = new FormData();
-    formData.append('file', files[0]);
+    formData.append('files', files[0]);
     formData.append('targetLanguage', targetLanguage);
 
     const result = await postFile('/ai-translate', formData, {

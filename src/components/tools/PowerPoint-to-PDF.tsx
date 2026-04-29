@@ -30,10 +30,16 @@ export default function PowerPointToPdfTool() {
     removeFile,
     processFiles,
   } = usePdfTool({
-    endpoint: '/pptx-to-pdf',
+    endpoint: '/convert-office-to-pdf',
     outputFilename: 'Hasil-PowerPoint-ke-PDFTools.pdf',
     maxFiles: 10,
     minFiles: 1,
+    allowedTypes: [
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'application/vnd.ms-powerpoint',
+      '.ppt',
+      '.pptx'
+    ],
   });
 
   const processingText = `Mengonversi... ${uploadProgress}%`;

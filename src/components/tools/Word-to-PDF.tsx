@@ -31,10 +31,16 @@ export default function WordToPdfTool() {
     removeFile,
     processFiles,
   } = usePdfTool({
-    endpoint: '/word-to-pdf',
+    endpoint: '/convert-office-to-pdf',
     outputFilename: 'Hasil-Word-ke-PDFTools.pdf',
     maxFiles: 10,
     minFiles: 1,
+    allowedTypes: [
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/msword',
+      '.doc',
+      '.docx'
+    ],
   });
 
   const handleAddFiles = useCallback(
