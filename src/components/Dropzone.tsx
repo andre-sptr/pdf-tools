@@ -11,6 +11,39 @@ export interface DropzoneProps {
   dropzoneText?: string;
 }
 
+const isValidFileType = (file: File, accept: string): boolean => {
+  if (!accept || accept === '*' || accept === '*/*') return true;
+
+  const extensions = accept.split(',').filter(ext => ext.startsWith('.'));
+  const mimeTypes = accept.split(',').filter(ext => !ext.startsWith('.'));
+
+  const fileName = file.name.toLowerCase();
+  const fileType = file.type.toLowerCase();
+
+  for (const ext of extensions) {
+    const ext_clean = ext.trim().toLowerCase();
+    if (fileName.endsWith(ext_clean)) return true;
+  }
+
+  for (const mime of mimeTypes) {
+    const mime_clean = mime.trim().toLowerCase();
+    if (fileType === mime_clean || fileType === `${mime_clean}/*`) return true;
+  }
+
+  return extensions.length === 0 && mimeTypes.length === 0;
+};
+
+const filterValidFiles = (files: FileList | File[], accept: string, maxFiles: number): File[] => {
+  const fileArray = Array.from(files);
+  let validFiles = fileArray.filter(file => isValidFileType(file, accept));
+
+  if (validFiles.length > maxFiles) {
+    validFiles = validFiles.slice(0, maxFiles);
+  }
+
+  return validFiles;
+};
+
 export default function Dropzone({
   onFilesSelected,
   accept = '.pdf',
@@ -36,17 +69,15 @@ export default function Dropzone({
 
       const { files } = e.dataTransfer;
       if (files && files.length > 0) {
-        if (maxFiles && files.length > maxFiles) {
-          const newFiles = Array.from(files).slice(0, maxFiles);
+        const validFiles = filterValidFiles(files, accept, maxFiles);
+        if (validFiles.length > 0) {
           const dataTransfer = new DataTransfer();
-          newFiles.forEach((file) => dataTransfer.items.add(file));
+          validFiles.forEach((file) => dataTransfer.items.add(file));
           onFilesSelected(dataTransfer.files);
-        } else {
-          onFilesSelected(files);
         }
       }
     },
-    [disabled, maxFiles, onFilesSelected]
+    [disabled, maxFiles, onFilesSelected, accept]
   );
 
   const handleClick = useCallback(() => {
@@ -59,11 +90,16 @@ export default function Dropzone({
     (e: ChangeEvent<HTMLInputElement>) => {
       const { files } = e.target;
       if (files && files.length > 0) {
-        onFilesSelected(files);
+        const validFiles = filterValidFiles(files, accept, maxFiles);
+        if (validFiles.length > 0) {
+          const dataTransfer = new DataTransfer();
+          validFiles.forEach((file) => dataTransfer.items.add(file));
+          onFilesSelected(dataTransfer.files);
+        }
         e.target.value = '';
       }
     },
-    [onFilesSelected]
+    [onFilesSelected, accept, maxFiles]
   );
 
   const handleKeyDown = useCallback(

@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import type { AxiosProgressEvent } from 'axios';
 import { useToast } from '@/components/ui/use-toast';
-import { postFile, downloadBlob, validatePdfFile, type ApiResponse, type UploadOptions } from '@/lib/api';
+import { postFile, downloadBlob, type ApiResponse, type UploadOptions } from '@/lib/api';
 
 export interface UsePdfToolOptions {
   endpoint: string;
@@ -121,6 +121,15 @@ export function usePdfTool({
   }, []);
 
   const processFiles = useCallback(async () => {
+    if (isProcessing) {
+      toast({
+        title: 'Sedang memproses',
+        description: 'Mohon tunggu hingga proses selesai.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     const validationError = validateFiles(files, minFiles);
     if (validationError) {
       toast({
@@ -149,7 +158,7 @@ export function usePdfTool({
         const progress = Math.round((event.loaded / event.total) * 100);
         setUploadProgress(progress);
       } else {
-        setUploadProgress(-1);
+        setUploadProgress(0);
       }
     };
 
@@ -178,7 +187,7 @@ export function usePdfTool({
     setIsProcessing(false);
     setUploadProgress(0);
     abortControllerRef.current = null;
-  }, [files, endpoint, outputFilename, minFiles, toast]);
+  }, [files, endpoint, outputFilename, minFiles, toast, isProcessing]);
 
   const reset = useCallback(() => {
     setFiles([]);

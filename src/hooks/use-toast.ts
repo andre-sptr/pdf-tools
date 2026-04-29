@@ -68,6 +68,14 @@ const addToRemoveQueue = (toastId: string) => {
   toastTimeouts.set(toastId, timeout);
 };
 
+export const cleanupToasts = () => {
+  toastTimeouts.forEach((timeout) => {
+    clearTimeout(timeout);
+  });
+  toastTimeouts.clear();
+  listeners.length = 0;
+};
+
 export const reducer = (state: State, action: Action): State => {
   switch (action.type) {
     case 'ADD_TOAST':
@@ -171,6 +179,10 @@ function useToast() {
       if (index > -1) {
         listeners.splice(index, 1);
       }
+      toastTimeouts.forEach((timeout) => {
+        clearTimeout(timeout);
+      });
+      toastTimeouts.clear();
     };
   }, []);
 
