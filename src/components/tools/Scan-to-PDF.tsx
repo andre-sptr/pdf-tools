@@ -3,18 +3,24 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import Dropzone from '@/components/Dropzone';
-import { X, Loader2, Image } from 'lucide-react';
+import { Image, X, Loader2, ScanLine } from 'lucide-react';
 import { usePdfTool } from '@/hooks/usePdfTool';
 import { postFile, downloadBlob } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
 
-const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png'];
+const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/tiff', 'image/bmp'];
 
 function validateImageFile(file: File): boolean {
-  return ACCEPTED_IMAGE_TYPES.includes(file.type);
+  return ACCEPTED_TYPES.includes(file.type) ||
+    file.name.endsWith('.jpg') ||
+    file.name.endsWith('.jpeg') ||
+    file.name.endsWith('.png') ||
+    file.name.endsWith('.tiff') ||
+    file.name.endsWith('.tif') ||
+    file.name.endsWith('.bmp');
 }
 
-export default function ConvertToPdfTool() {
+export default function ScanToPdfTool() {
   const [files, setFiles] = useState<File[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -30,25 +36,23 @@ export default function ConvertToPdfTool() {
     if (invalidCount > 0) {
       toast({
         title: 'File tidak valid',
-        description: `${invalidCount} file bukan JPG/PNG dan telah diabaikan.`,
+        description: `${invalidCount} bukan file gambar dan telah diabaikan.`,
         variant: 'destructive',
       });
     }
 
-    if (validFiles.length > 0) {
-      setFiles((prev) => [...prev, ...validFiles]);
-    }
+    setFiles(prev => [...prev, ...validFiles]);
   }, [toast]);
 
   const removeFile = useCallback((index: number) => {
-    setFiles((prev) => prev.filter((_, i) => i !== index));
-  }, []);
+    setFiles(files.filter((_, i) => i !== index));
+  }, [files]);
 
-  const handleConvertToPdf = useCallback(async () => {
+  const handleProcess = useCallback(async () => {
     if (files.length === 0) {
       toast({
         title: 'File tidak ditemukan',
-        description: 'Silakan pilih minimal 1 file gambar (JPG/PNG).',
+        description: 'Silakan pilih minimal 1 file gambar.',
         variant: 'destructive',
       });
       return;
@@ -58,11 +62,11 @@ export default function ConvertToPdfTool() {
     setUploadProgress(0);
 
     const formData = new FormData();
-    files.forEach((file) => {
+    files.forEach(file => {
       formData.append('files', file);
     });
 
-    const result = await postFile('/convert-to-pdf', formData, {
+    const result = await postFile('/scan-to-pdf', formData, {
       onProgress: (event) => {
         if (event.total && event.loaded) {
           setUploadProgress(Math.round((event.loaded / event.total) * 100));
@@ -77,10 +81,10 @@ export default function ConvertToPdfTool() {
         variant: 'destructive',
       });
     } else if (result.data) {
-      downloadBlob(result.data as Blob, 'Hasil-Konversi-PDFTools.pdf');
+      downloadBlob(result.data as Blob, 'Hasil-Scan-ke-PDFTools.pdf');
       toast({
         title: 'Berhasil!',
-        description: 'File gambar telah dikonversi ke PDF.',
+        description: 'Gambar telah dikonversi ke PDF.',
       });
       setFiles([]);
     }
@@ -99,16 +103,16 @@ export default function ConvertToPdfTool() {
         {!files.length && (
           <Dropzone
             onFilesSelected={addFiles}
-            accept="image/jpeg,image/png"
+            accept="image/jpeg,image/png,image/tiff,image/bmp"
             multiple
             maxFiles={50}
-            dropzoneText="Seret & Lepaskan file Gambar (JPG/PNG) di sini"
+            dropzoneText="Seret & Lepaskan file Scan/Gambar di sini"
           />
         )}
 
         {files.length > 0 && (
           <div className="mt-6 px-4">
-            <h3 className="font-semibold text-blue-900 mb-3">File yang akan dikonversi:</h3>
+            <h3 className="font-semibold text-blue-900 mb-3">File yang akan dikonversi ke PDF:</h3>
             <ul className="space-y-2">
               {files.map((file, index) => (
                 <li
@@ -144,7 +148,7 @@ export default function ConvertToPdfTool() {
         <div className="mt-8">
           <Button
             className="w-full bg-gradient-to-r from-blue-600 to-blue-500 text-lg py-6"
-            onClick={handleConvertToPdf}
+            onClick={handleProcess}
             disabled={isProcessing || files.length === 0}
           >
             {isProcessing ? (
@@ -153,7 +157,10 @@ export default function ConvertToPdfTool() {
                 {processingText}
               </>
             ) : (
-              'Konversi ke PDF Sekarang'
+              <>
+                <ScanLine className="mr-2 h-5 w-5" />
+                Konversi ke PDF Sekarang
+              </>
             )}
           </Button>
         </div>

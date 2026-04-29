@@ -3,69 +3,26 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import Dropzone from '@/components/Dropzone';
-import { FileText, X, Loader2 } from 'lucide-react';
+import { FileText, X, Loader2, Table } from 'lucide-react';
 import { usePdfTool } from '@/hooks/usePdfTool';
-import { postFile, downloadBlob, validatePdfFile } from '@/lib/api';
+import { postFile, downloadBlob } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
 
-export default function ConvertFromPdfTool() {
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
+export default function PdfToExcelTool() {
   const { toast } = useToast();
 
   const {
     files,
+    isProcessing,
+    uploadProgress,
     addFiles,
     removeFile,
   } = usePdfTool({
-    endpoint: '/convert-from-pdf',
-    outputFilename: 'Hasil-Konversi-JPG.zip',
+    endpoint: '/pdf-to-excel',
+    outputFilename: 'Hasil-PDF-ke-Excel.xlsx',
     maxFiles: 1,
     minFiles: 1,
   });
-
-  const handleConvertFromPdf = useCallback(async () => {
-    if (files.length === 0) {
-      toast({
-        title: 'File tidak ditemukan',
-        description: 'Silakan pilih 1 file PDF untuk dikonversi.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setIsProcessing(true);
-    setUploadProgress(0);
-
-    const formData = new FormData();
-    formData.append('file', files[0]);
-
-    const result = await postFile('/convert-from-pdf', formData, {
-      onProgress: (event) => {
-        if (event.total && event.loaded) {
-          setUploadProgress(Math.round((event.loaded / event.total) * 100));
-        }
-      },
-    });
-
-    if (result.error) {
-      toast({
-        title: 'Terjadi kesalahan',
-        description: result.error.message,
-        variant: 'destructive',
-      });
-    } else if (result.data) {
-      downloadBlob(result.data as Blob, 'Hasil-Konversi-JPG.zip');
-      toast({
-        title: 'Berhasil!',
-        description: 'File PDF telah dikonversi ke JPG dan diunduh sebagai ZIP.',
-      });
-      removeFile(0);
-    }
-
-    setIsProcessing(false);
-    setUploadProgress(0);
-  }, [files, removeFile, toast]);
 
   const processingText = `Mengonversi... ${uploadProgress}%`;
 
@@ -80,14 +37,14 @@ export default function ConvertFromPdfTool() {
             accept=".pdf"
             multiple={false}
             maxFiles={1}
-            dropzoneText="Seret & Lepaskan 1 file PDF di sini"
-            hint="untuk diubah ke JPG"
+            dropzoneText="Seret & Lepaskan PDF di sini"
+            hint="untuk diubah ke Excel"
           />
         )}
 
         {files.length > 0 && (
           <div className="mt-6 px-4">
-            <h3 className="font-semibold text-blue-900 mb-3">File yang akan dikonversi ke JPG:</h3>
+            <h3 className="font-semibold text-blue-900 mb-3">File yang akan dikonversi ke Excel:</h3>
             <div className="flex items-center p-3 bg-white border border-blue-100 rounded-lg shadow-sm">
               <FileText className="w-6 h-6 text-blue-600 mr-4" />
               <span className="flex-grow text-sm font-medium text-gray-800 truncate">
@@ -116,7 +73,7 @@ export default function ConvertFromPdfTool() {
         <div className="mt-8">
           <Button
             className="w-full bg-gradient-to-r from-blue-600 to-blue-500 text-lg py-6"
-            onClick={handleConvertFromPdf}
+            onClick={processFiles}
             disabled={isProcessing || files.length === 0}
           >
             {isProcessing ? (
@@ -125,7 +82,10 @@ export default function ConvertFromPdfTool() {
                 {processingText}
               </>
             ) : (
-              'Konversi ke JPG Sekarang'
+              <>
+                <Table className="mr-2 h-5 w-5" />
+                Konversi ke Excel Sekarang
+              </>
             )}
           </Button>
         </div>

@@ -2,33 +2,55 @@ import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Dropzone from '@/components/Dropzone';
-import { FileText, X, Loader2 } from 'lucide-react';
-import { usePdfTool } from '@/hooks/usePdfTool';
-import { postFile, downloadBlob, validatePdfFile } from '@/lib/api';
+import { FileText, X, Loader2, Sparkles } from 'lucide-react';
+import { postFile, downloadBlob } from '@/lib/api';
+import { validatePdfFile } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
 
-export default function ConvertFromPdfTool() {
+export default function AiSummarizerTool() {
+  const [summaryLength, setSummaryLength] = useState('medium');
+  const [files, setFiles] = useState<File[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const { toast } = useToast();
 
-  const {
-    files,
-    addFiles,
-    removeFile,
-  } = usePdfTool({
-    endpoint: '/convert-from-pdf',
-    outputFilename: 'Hasil-Konversi-JPG.zip',
-    maxFiles: 1,
-    minFiles: 1,
-  });
+  const addFiles = useCallback((newFiles: FileList | File[] | null) => {
+    if (!newFiles || newFiles.length === 0) return;
+    const fileArray = Array.from(newFiles);
+    const validFiles = fileArray.filter(validatePdfFile);
+    const invalidCount = fileArray.length - validFiles.length;
 
-  const handleConvertFromPdf = useCallback(async () => {
+    if (invalidCount > 0) {
+      toast({
+        title: 'File tidak valid',
+        description: `${invalidCount} file bukan PDF dan telah diabaikan.`,
+        variant: 'destructive',
+      });
+    }
+
+    if (validFiles.length === 0) {
+      toast({
+        title: 'File tidak valid',
+        description: 'Tidak ada file PDF yang dipilih.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setFiles(validFiles.slice(0, 1));
+  }, [toast]);
+
+  const removeFile = useCallback(() => {
+    setFiles([]);
+  }, []);
+
+  const processFiles = useCallback(async () => {
     if (files.length === 0) {
       toast({
-        title: 'File tidak ditemukan',
-        description: 'Silakan pilih 1 file PDF untuk dikonversi.',
+        title: 'Validasi gagal',
+        description: 'Silakan pilih 1 file PDF.',
         variant: 'destructive',
       });
       return;
@@ -39,8 +61,9 @@ export default function ConvertFromPdfTool() {
 
     const formData = new FormData();
     formData.append('file', files[0]);
+    formData.append('summaryLength', summaryLength);
 
-    const result = await postFile('/convert-from-pdf', formData, {
+    const result = await postFile('/ai-summarize', formData, {
       onProgress: (event) => {
         if (event.total && event.loaded) {
           setUploadProgress(Math.round((event.loaded / event.total) * 100));
@@ -55,19 +78,19 @@ export default function ConvertFromPdfTool() {
         variant: 'destructive',
       });
     } else if (result.data) {
-      downloadBlob(result.data as Blob, 'Hasil-Konversi-JPG.zip');
+      downloadBlob(result.data as Blob, 'Hasil-Ringkasan-AI.txt');
       toast({
         title: 'Berhasil!',
-        description: 'File PDF telah dikonversi ke JPG dan diunduh sebagai ZIP.',
+        description: 'Ringkasan AI telah dibuat dan diunduh.',
       });
-      removeFile(0);
+      setFiles([]);
     }
 
     setIsProcessing(false);
     setUploadProgress(0);
-  }, [files, removeFile, toast]);
+  }, [files, summaryLength, toast]);
 
-  const processingText = `Mengonversi... ${uploadProgress}%`;
+  const processingText = `Membuat ringkasan AI... ${uploadProgress}%`;
 
   return (
     <Card className="w-full shadow-none border-none">
@@ -80,14 +103,14 @@ export default function ConvertFromPdfTool() {
             accept=".pdf"
             multiple={false}
             maxFiles={1}
-            dropzoneText="Seret & Lepaskan 1 file PDF di sini"
-            hint="untuk diubah ke JPG"
+            dropzoneText="Seret & Lepaskan PDF di sini"
+            hint="untuk dibuatkan ringkasan AI"
           />
         )}
 
         {files.length > 0 && (
           <div className="mt-6 px-4">
-            <h3 className="font-semibold text-blue-900 mb-3">File yang akan dikonversi ke JPG:</h3>
+            <h3 className="font-semibold text-blue-900 mb-3">File yang akan diringkas:</h3>
             <div className="flex items-center p-3 bg-white border border-blue-100 rounded-lg shadow-sm">
               <FileText className="w-6 h-6 text-blue-600 mr-4" />
               <span className="flex-grow text-sm font-medium text-gray-800 truncate">
@@ -96,13 +119,29 @@ export default function ConvertFromPdfTool() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => removeFile(0)}
+                onClick={removeFile}
                 className="p-1 h-auto"
                 disabled={isProcessing}
               >
                 <X className="w-5 h-5 text-red-500" />
               </Button>
             </div>
+          </div>
+        )}
+
+        {files.length > 0 && (
+          <div className="mt-6 px-4 space-y-3">
+            <h3 className="font-semibold text-blue-900">Panjang Ringkasan</h3>
+            <Select value={summaryLength} onValueChange={setSummaryLength}>
+              <SelectTrigger>
+                <SelectValue placeholder="Pilih panjang ringkasan" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="short">Pendek (1-2 paragraf)</SelectItem>
+                <SelectItem value="medium">Sedang (3-4 paragraf)</SelectItem>
+                <SelectItem value="long">Panjang (halaman penuh)</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         )}
 
@@ -116,7 +155,7 @@ export default function ConvertFromPdfTool() {
         <div className="mt-8">
           <Button
             className="w-full bg-gradient-to-r from-blue-600 to-blue-500 text-lg py-6"
-            onClick={handleConvertFromPdf}
+            onClick={processFiles}
             disabled={isProcessing || files.length === 0}
           >
             {isProcessing ? (
@@ -125,7 +164,10 @@ export default function ConvertFromPdfTool() {
                 {processingText}
               </>
             ) : (
-              'Konversi ke JPG Sekarang'
+              <>
+                <Sparkles className="mr-2 h-5 w-5" />
+                Buat Ringkasan AI Sekarang
+              </>
             )}
           </Button>
         </div>

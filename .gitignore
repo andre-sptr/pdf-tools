@@ -10,8 +10,8 @@ lerna-debug.log*
 # Dependensi (Frontend)
 /node_modules
 
-# Dependensi (Backend)
-/backend/node_modules
+# Dependensi (Server)
+/server/node_modules
 
 # Build output
 /dist

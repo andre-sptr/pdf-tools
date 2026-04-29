@@ -1,48 +1,66 @@
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import Dropzone from '@/components/Dropzone';
-import { FileText, X, GripVertical, Loader2 } from 'lucide-react';
+import { FileText, X, Loader2 } from 'lucide-react';
 import { usePdfTool } from '@/hooks/usePdfTool';
+import { useToast } from '@/components/ui/use-toast';
 
-export default function MergePdfTool() {
+const ACCEPTED_TYPES = [
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/msword',
+];
+
+function validateWordFile(file: File): boolean {
+  return (
+    ACCEPTED_TYPES.includes(file.type) ||
+    file.name.endsWith('.docx') ||
+    file.name.endsWith('.doc')
+  );
+}
+
+export default function WordToPdfTool() {
+  const { toast } = useToast();
+
   const {
     files,
     isProcessing,
     uploadProgress,
     addFiles,
     removeFile,
-    reorderFiles,
     processFiles,
   } = usePdfTool({
-    endpoint: '/merge-pdf',
-    outputFilename: 'Hasil-Gabungan-PDFTools.pdf',
-    maxFiles: 20,
-    minFiles: 2,
+    endpoint: '/word-to-pdf',
+    outputFilename: 'Hasil-Word-ke-PDFTools.pdf',
+    maxFiles: 10,
+    minFiles: 1,
   });
 
-  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const handleAddFiles = useCallback(
+    (newFiles: FileList | File[] | null) => {
+      if (!newFiles || newFiles.length === 0) return;
 
-  const handleDragStart = useCallback((index: number) => {
-    setDraggedIndex(index);
-  }, []);
+      const fileArray = Array.from(newFiles);
+      const validFiles = fileArray.filter(validateWordFile);
+      const invalidCount = fileArray.length - validFiles.length;
 
-  const handleDragOver = useCallback((e: React.DragEvent<HTMLLIElement>) => {
-    e.preventDefault();
-  }, []);
+      if (invalidCount > 0) {
+        toast({
+          title: 'File tidak valid',
+          description: `${invalidCount} file bukan Word (.doc/.docx) dan telah diabaikan.`,
+          variant: 'destructive',
+        });
+      }
 
-  const handleDrop = useCallback(
-    (targetIndex: number) => {
-      if (draggedIndex !== null) {
-        reorderFiles(draggedIndex, targetIndex);
-        setDraggedIndex(null);
+      if (validFiles.length > 0) {
+        addFiles(validFiles);
       }
     },
-    [draggedIndex, reorderFiles]
+    [addFiles, toast]
   );
 
-  const processingText = `Menggabungkan... ${uploadProgress}%`;
+  const processingText = `Mengonversi... ${uploadProgress}%`;
 
   return (
     <Card className="w-full shadow-none border-none">
@@ -51,31 +69,23 @@ export default function MergePdfTool() {
 
         {!files.length && (
           <Dropzone
-            onFilesSelected={addFiles}
-            accept=".pdf"
+            onFilesSelected={handleAddFiles}
+            accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             multiple
-            maxFiles={20}
-            dropzoneText="Seret & Lepaskan file PDF di sini"
+            maxFiles={10}
+            dropzoneText="Seret & Lepaskan file Word (DOC/DOCX) di sini"
           />
         )}
 
         {files.length > 0 && (
           <div className="mt-6 px-4">
-            <h3 className="font-semibold text-blue-900 mb-3">
-              File yang akan digabungkan (urutkan dengan drag):
-            </h3>
+            <h3 className="font-semibold text-blue-900 mb-3">File yang akan dikonversi ke PDF:</h3>
             <ul className="space-y-2">
               {files.map((file, index) => (
                 <li
                   key={`${file.name}-${index}`}
-                  className="flex items-center p-3 bg-white border border-blue-100 rounded-lg shadow-sm transition-opacity"
-                  draggable={!isProcessing}
-                  onDragStart={() => handleDragStart(index)}
-                  onDragOver={handleDragOver}
-                  onDrop={() => handleDrop(index)}
-                  style={{ opacity: draggedIndex === index ? 0.5 : 1 }}
+                  className="flex items-center p-3 bg-white border border-blue-100 rounded-lg shadow-sm"
                 >
-                  <GripVertical className="w-5 h-5 text-gray-400 cursor-move mr-3" />
                   <FileText className="w-6 h-6 text-blue-600 mr-4" />
                   <span className="flex-grow text-sm font-medium text-gray-800 truncate">
                     {file.name}
@@ -106,7 +116,7 @@ export default function MergePdfTool() {
           <Button
             className="w-full bg-gradient-to-r from-blue-600 to-blue-500 text-lg py-6"
             onClick={processFiles}
-            disabled={isProcessing || files.length < 2}
+            disabled={isProcessing || files.length === 0}
           >
             {isProcessing ? (
               <>
@@ -114,7 +124,7 @@ export default function MergePdfTool() {
                 {processingText}
               </>
             ) : (
-              'Gabungkan PDF Sekarang'
+              'Konversi ke PDF Sekarang'
             )}
           </Button>
         </div>

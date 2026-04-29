@@ -6,7 +6,7 @@ export default function About() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
       <Header />
-      
+
       {/* Hero Section */}
       <section className="bg-gradient-to-r from-blue-700 to-blue-600 text-white py-16">
         <div className="container mx-auto px-4">
@@ -16,7 +16,7 @@ export default function About() {
               Tentang PDF Tools
             </h1>
             <p className="text-xl text-blue-100 leading-relaxed">
-              Platform pengolah PDF yang dirancang khusus untuk mendukung 
+              Platform pengolah PDF yang dirancang khusus untuk mendukung
               literasi digital Akademik.
             </p>
           </div>
@@ -37,8 +37,8 @@ export default function About() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-gray-600 leading-relaxed text-center">
-                    Menyediakan solusi teknologi yang mudah diakses untuk mendukung 
-                    kegiatan belajar mengajar, penelitian, dan administrasi akademik 
+                    Menyediakan solusi teknologi yang mudah diakses untuk mendukung
+                    kegiatan belajar mengajar, penelitian, dan administrasi akademik
                     dengan standar keamanan tinggi.
                   </p>
                 </CardContent>
@@ -53,8 +53,8 @@ export default function About() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-gray-600 leading-relaxed text-center">
-                    Menjadi platform digital terdepan yang memberdayakan generasi 
-                    cendekia Indonesia dengan teknologi yang inovatif, aman, 
+                    Menjadi platform digital terdepan yang memberdayakan generasi
+                    cendekia Indonesia dengan teknologi yang inovatif, aman,
                     dan mudah digunakan untuk semua kalangan.
                   </p>
                 </CardContent>
@@ -67,7 +67,7 @@ export default function About() {
                 Mengapa PDF Tools?
               </h2>
               <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-                Kami memahami kebutuhan khusus lingkungan pendidikan dan 
+                Kami memahami kebutuhan khusus lingkungan pendidikan dan
                 menghadirkan solusi yang tepat sasaran.
               </p>
             </div>
@@ -82,7 +82,7 @@ export default function About() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-gray-600">
-                    File diproses secara lokal dan otomatis dihapus. 
+                    File diproses secara lokal dan otomatis dihapus.
                     Tidak ada data yang disimpan di server kami.
                   </p>
                 </CardContent>
@@ -97,7 +97,7 @@ export default function About() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-gray-600">
-                    Dirancang untuk guru, siswa, dan staff administrasi 
+                    Dirancang untuk guru, siswa, dan staff administrasi
                     dengan antarmuka yang intuitif dan mudah dipahami.
                   </p>
                 </CardContent>
@@ -112,7 +112,7 @@ export default function About() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-gray-600">
-                    Komitmen kami untuk mendukung pendidikan Indonesia 
+                    Komitmen kami untuk mendukung pendidikan Indonesia
                     dengan menyediakan layanan gratis tanpa batas.
                   </p>
                 </CardContent>
@@ -126,10 +126,10 @@ export default function About() {
       <footer className="bg-blue-900 text-white py-4">
         <div className="container mx-auto px-4 text-center">
           <p className="text-blue-200">
-            <a 
-              href="https://flamyheart.site" 
-              target="_blank" 
-              rel="noopener noreferrer" 
+            <a
+              href="https://andresptr.site"
+              target="_blank"
+              rel="noopener noreferrer"
               className="font-semibold text-white hover:underline"
             >
               © {new Date().getFullYear()} Andre Saputra

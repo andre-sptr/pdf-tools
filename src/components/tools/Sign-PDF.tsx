@@ -2,13 +2,15 @@ import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { Input } from '@/components/ui/input';
 import Dropzone from '@/components/Dropzone';
-import { FileText, X, Loader2 } from 'lucide-react';
+import { FileText, X, Loader2, PenTool } from 'lucide-react';
 import { usePdfTool } from '@/hooks/usePdfTool';
-import { postFile, downloadBlob, validatePdfFile } from '@/lib/api';
+import { postFile, downloadBlob } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
 
-export default function ConvertFromPdfTool() {
+export default function SignPdfTool() {
+  const [signatureText, setSignatureText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const { toast } = useToast();
@@ -18,17 +20,17 @@ export default function ConvertFromPdfTool() {
     addFiles,
     removeFile,
   } = usePdfTool({
-    endpoint: '/convert-from-pdf',
-    outputFilename: 'Hasil-Konversi-JPG.zip',
+    endpoint: '/sign-pdf',
+    outputFilename: 'Hasil-Tanda-Tangan-PDFTools.pdf',
     maxFiles: 1,
     minFiles: 1,
   });
 
-  const handleConvertFromPdf = useCallback(async () => {
-    if (files.length === 0) {
+  const handleProcess = useCallback(async () => {
+    if (!files.length || !signatureText.trim()) {
       toast({
-        title: 'File tidak ditemukan',
-        description: 'Silakan pilih 1 file PDF untuk dikonversi.',
+        title: 'Data tidak lengkap',
+        description: 'Silakan pilih file PDF dan masukkan tanda tangan.',
         variant: 'destructive',
       });
       return;
@@ -39,8 +41,9 @@ export default function ConvertFromPdfTool() {
 
     const formData = new FormData();
     formData.append('file', files[0]);
+    formData.append('signature', signatureText);
 
-    const result = await postFile('/convert-from-pdf', formData, {
+    const result = await postFile('/sign-pdf', formData, {
       onProgress: (event) => {
         if (event.total && event.loaded) {
           setUploadProgress(Math.round((event.loaded / event.total) * 100));
@@ -55,19 +58,20 @@ export default function ConvertFromPdfTool() {
         variant: 'destructive',
       });
     } else if (result.data) {
-      downloadBlob(result.data as Blob, 'Hasil-Konversi-JPG.zip');
+      downloadBlob(result.data as Blob, 'Hasil-Tanda-Tangan-PDFTools.pdf');
       toast({
         title: 'Berhasil!',
-        description: 'File PDF telah dikonversi ke JPG dan diunduh sebagai ZIP.',
+        description: 'PDF telah ditandatangani.',
       });
+      setSignatureText('');
       removeFile(0);
     }
 
     setIsProcessing(false);
     setUploadProgress(0);
-  }, [files, removeFile, toast]);
+  }, [files, signatureText, removeFile, toast]);
 
-  const processingText = `Mengonversi... ${uploadProgress}%`;
+  const processingText = `Menandatangani... ${uploadProgress}%`;
 
   return (
     <Card className="w-full shadow-none border-none">
@@ -80,14 +84,13 @@ export default function ConvertFromPdfTool() {
             accept=".pdf"
             multiple={false}
             maxFiles={1}
-            dropzoneText="Seret & Lepaskan 1 file PDF di sini"
-            hint="untuk diubah ke JPG"
+            dropzoneText="Seret & Lepaskan PDF untuk ditandatangani di sini"
           />
         )}
 
         {files.length > 0 && (
           <div className="mt-6 px-4">
-            <h3 className="font-semibold text-blue-900 mb-3">File yang akan dikonversi ke JPG:</h3>
+            <h3 className="font-semibold text-blue-900 mb-3">File yang akan ditandatangani:</h3>
             <div className="flex items-center p-3 bg-white border border-blue-100 rounded-lg shadow-sm">
               <FileText className="w-6 h-6 text-blue-600 mr-4" />
               <span className="flex-grow text-sm font-medium text-gray-800 truncate">
@@ -106,6 +109,19 @@ export default function ConvertFromPdfTool() {
           </div>
         )}
 
+        {files.length > 0 && (
+          <div className="mt-6 px-4 space-y-3">
+            <h3 className="font-semibold text-blue-900">Tanda Tangan</h3>
+            <Input
+              type="text"
+              placeholder="Masukkan nama tanda tangan Anda"
+              value={signatureText}
+              onChange={(e) => setSignatureText(e.target.value)}
+              disabled={isProcessing}
+            />
+          </div>
+        )}
+
         {isProcessing && (
           <div className="mt-4 px-4">
             <Progress value={uploadProgress} className="h-2" />
@@ -116,8 +132,8 @@ export default function ConvertFromPdfTool() {
         <div className="mt-8">
           <Button
             className="w-full bg-gradient-to-r from-blue-600 to-blue-500 text-lg py-6"
-            onClick={handleConvertFromPdf}
-            disabled={isProcessing || files.length === 0}
+            onClick={handleProcess}
+            disabled={isProcessing || files.length === 0 || !signatureText}
           >
             {isProcessing ? (
               <>
@@ -125,7 +141,10 @@ export default function ConvertFromPdfTool() {
                 {processingText}
               </>
             ) : (
-              'Konversi ke JPG Sekarang'
+              <>
+                <PenTool className="mr-2 h-5 w-5" />
+                Tanda Tangani PDF Sekarang
+              </>
             )}
           </Button>
         </div>

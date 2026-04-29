@@ -159,7 +159,7 @@ export default function FAQ() {
         <div className="container mx-auto px-4 text-center">
           <p className="text-blue-200">
             <a 
-              href="https://flamyheart.site" 
+              href="https://andresptr.site" 
               target="_blank" 
               rel="noopener noreferrer" 
               className="font-semibold text-white hover:underline"

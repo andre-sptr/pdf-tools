@@ -19,20 +19,20 @@ export default function Contact() {
   const [result, setResult] = useState({ success: null, message: '' });;
 
   const handleSubmit = async (e) => {
-    e.preventDefault(); // Mencegah halaman reload saat submit
+    e.preventDefault();
     setIsSubmitting(true);
-    setResult({ success: null, message: '' }); // Reset hasil sebelumnya
+    setResult({ success: null, message: '' });
 
     const dataToSend = {
       ...formData,
-      access_key: "d8f6ca40-63ed-4e63-8466-9e197cc1a546", 
-      from_name: "Pesan dari Website PDF Tools", // Nama pengirim di email Anda
-      subject: `Pesan Baru: ${formData.subject}`, // Menambahkan prefix subjek
+      access_key: "d8f6ca40-63ed-4e63-8466-9e197cc1a546",
+      from_name: "Pesan dari Website PDF Tools",
+      subject: `Pesan Baru: ${formData.subject}`,
     };
 
     try {
       const response = await axios.post('https://api.web3forms.com/submit', dataToSend);
-      
+
       if (response.data.success) {
         setResult({ success: true, message: "Pesan berhasil terkirim! Terima kasih." });
         setFormData({ name: '', email: '', subject: '', message: '' });
@@ -57,7 +57,7 @@ export default function Contact() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
       <Header />
-      
+
       {/* Hero Section */}
       <section className="bg-gradient-to-r from-blue-700 to-blue-600 text-white py-16">
         <div className="container mx-auto px-4">
@@ -115,7 +115,7 @@ export default function Contact() {
                         />
                       </div>
                     </div>
-                    
+
                     <div className="space-y-2">
                       <Label htmlFor="subject">Subjek</Label>
                       <Input
@@ -129,7 +129,7 @@ export default function Contact() {
                         className="border-blue-200 focus:border-blue-500"
                       />
                     </div>
-                    
+
                     <div className="space-y-2">
                       <Label htmlFor="message">Pesan</Label>
                       <Textarea
@@ -143,7 +143,7 @@ export default function Contact() {
                         className="border-blue-200 focus:border-blue-500"
                       />
                     </div>
-                    
+
                     <Button
                       type="submit"
                       disabled={isSubmitting}
@@ -152,9 +152,8 @@ export default function Contact() {
                       {isSubmitting ? 'Mengirim...' : 'Kirim Pesan'}
                     </Button>
                     {result.message && (
-                      <p className={`text-center mt-4 text-sm font-medium ${
-                        result.success ? 'text-green-600' : 'text-red-600'
-                      }`}>
+                      <p className={`text-center mt-4 text-sm font-medium ${result.success ? 'text-green-600' : 'text-red-600'
+                        }`}>
                         {result.message}
                       </p>
                     )}
@@ -244,7 +243,7 @@ export default function Contact() {
                       Respon Cepat & Terpercaya
                     </h3>
                     <p className="text-blue-100 mb-4">
-                      Tim support kami berkomitmen merespons setiap pertanyaan 
+                      Tim support kami berkomitmen merespons setiap pertanyaan
                       dalam waktu maksimal 1x24 jam pada hari kerja.
                     </p>
                     <div className="flex items-center space-x-2 text-sm">
@@ -263,10 +262,10 @@ export default function Contact() {
       <footer className="bg-blue-900 text-white py-4">
         <div className="container mx-auto px-4 text-center">
           <p className="text-blue-200">
-            <a 
-              href="https://flamyheart.site" 
-              target="_blank" 
-              rel="noopener noreferrer" 
+            <a
+              href="https://andresptr.site"
+              target="_blank"
+              rel="noopener noreferrer"
               className="font-semibold text-white hover:underline"
             >
               © {new Date().getFullYear()} Andre Saputra

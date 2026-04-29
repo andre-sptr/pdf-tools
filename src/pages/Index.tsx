@@ -2,88 +2,42 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import Header from '@/components/Header';
 import ToolCard from '@/components/ToolCard';
-import { 
-  Merge, 
-  Split, 
-  Minimize2, 
-  FileInput, 
-  FileOutput, 
-  RotateCw,
+import {
+  FileInput,
   GraduationCap,
   Shield,
   Zap,
 } from 'lucide-react';
-
-const tools = [
-  {
-    icon: Merge,
-    title: 'Gabungkan PDF',
-    description: 'Gabungkan beberapa file PDF menjadi satu dokumen dengan mudah dan cepat.',
-    href: '/tool/merge-pdf'
-  },
-  {
-    icon: Split,
-    title: 'Pisahkan PDF',
-    description: 'Pisahkan file PDF menjadi beberapa halaman atau dokumen terpisah.',
-    href: '/tool/split-pdf'
-  },
-  {
-    icon: Minimize2,
-    title: 'Kompres PDF',
-    description: 'Kurangi ukuran file PDF tanpa mengurangi kualitas dokumen.',
-    href: '/tool/compress-pdf'
-  },
-  {
-    icon: FileInput,
-    title: 'Konversi ke PDF',
-    description: 'Ubah file Word, Excel, PowerPoint menjadi format PDF berkualitas tinggi.',
-    href: '/tool/convert-to-pdf'
-  },
-  {
-    icon: FileOutput,
-    title: 'Konversi dari PDF',
-    description: 'Konversi PDF ke format Word, Excel, atau PowerPoint dengan mudah.',
-    href: '/tool/convert-from-pdf'
-  },
-  {
-    icon: RotateCw,
-    title: 'Putar PDF',
-    description: 'Putar halaman PDF ke orientasi yang tepat sesuai kebutuhan Anda.',
-    href: '/tool/rotate-pdf'
-  }
-];
+import { toolCategories, getToolsByCategory } from '@/lib/tools-config';
 
 export default function Index() {
   const scrollToTools = () => {
-    document.getElementById('tools-section')?.scrollIntoView({ 
-      behavior: 'smooth' 
+    document.getElementById('tools-section')?.scrollIntoView({
+      behavior: 'smooth'
     });
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
       <Header />
-      
+
       {/* Hero Section */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-blue-700 via-blue-600 to-blue-500 opacity-90"></div>
         <div className="relative container mx-auto px-4 py-20 text-center text-white">
           <div className="max-w-4xl mx-auto space-y-8">
-            {/* Badge */}
             <div className="flex justify-center">
               <Badge className="bg-white/20 text-white border-white/30 px-4 py-2 text-sm font-medium backdrop-blur-sm">
                 <Shield className="w-4 h-4 mr-2" />
                 100% Aman · Gratis · Tanpa Watermark
               </Badge>
             </div>
-            
-            {/* Headline */}
+
             <h1 className="text-5xl md:text-6xl font-bold leading-tight">
               Ubah, Gabungkan, dan Kompres PDF dengan{' '}
               <span className="text-yellow-300">Mudah</span>
             </h1>
-            
-            {/* CTA Button */}
+
             <div className="pt-4">
               <Button
                 onClick={scrollToTools}
@@ -95,7 +49,7 @@ export default function Index() {
               </Button>
             </div>
           </div>
-          
+
           {/* Illustration */}
           <div className="mt-16 max-w-2xl mx-auto">
             <div className="relative">
@@ -118,7 +72,7 @@ export default function Index() {
         </div>
       </section>
 
-      {/* Tools Section */}
+      {/* Tools Section*/}
       <section id="tools-section" className="py-20">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
@@ -126,17 +80,38 @@ export default function Index() {
               Pilih Tool yang Anda Butuhkan
             </h2>
           </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
-            {tools.map((tool, index) => (
-              <ToolCard
-                key={index}
-                icon={tool.icon}
-                title={tool.title}
-                description={tool.description}
-                href={tool.href}
-              />
-            ))}
+
+          <div className="max-w-6xl mx-auto space-y-16">
+            {toolCategories.map((category) => {
+              const categoryTools = getToolsByCategory(category.id);
+              if (categoryTools.length === 0) return null;
+
+              return (
+                <div key={category.id}>
+                  <div className="mb-8">
+                    <h3 className="text-2xl font-bold text-blue-900">
+                      {category.title}
+                    </h3>
+                    <p className="text-gray-500 mt-1">
+                      {category.description}
+                    </p>
+                    <div className="mt-3 h-1 w-16 bg-gradient-to-r from-blue-600 to-blue-400 rounded-full" />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {categoryTools.map((tool) => (
+                      <ToolCard
+                        key={tool.slug}
+                        icon={tool.icon}
+                        title={tool.title}
+                        description={tool.description}
+                        href={`/tool/${tool.slug}`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -148,7 +123,7 @@ export default function Index() {
             <h2 className="text-3xl font-bold text-blue-900 mb-12">
               Mengapa Memilih PDF Tools?
             </h2>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               <div className="space-y-4">
                 <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto">
@@ -159,7 +134,7 @@ export default function Index() {
                   File Anda diproses secara lokal dan otomatis dihapus setelah 30 menit.
                 </p>
               </div>
-              
+
               <div className="space-y-4">
                 <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto">
                   <Zap className="w-8 h-8 text-blue-600" />
@@ -169,7 +144,7 @@ export default function Index() {
                   Proses file PDF dalam hitungan detik dengan teknologi terdepan.
                 </p>
               </div>
-              
+
               <div className="space-y-4">
                 <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto">
                   <GraduationCap className="w-8 h-8 text-blue-600" />
@@ -188,10 +163,10 @@ export default function Index() {
       <footer className="bg-blue-900 text-white py-4">
         <div className="container mx-auto px-4 text-center">
           <p className="text-blue-200">
-            <a 
-              href="https://flamyheart.site" 
-              target="_blank" 
-              rel="noopener noreferrer" 
+            <a
+              href="https://andresptr.site"
+              target="_blank"
+              rel="noopener noreferrer"
               className="font-semibold text-white hover:underline"
             >
               © {new Date().getFullYear()} Andre Saputra
