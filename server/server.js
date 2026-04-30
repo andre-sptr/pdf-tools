@@ -63,9 +63,6 @@ const upload = multer({
   limits: { fileSize: 50 * 1024 * 1024 }
 });
 
-// ========================================================================
-// ENDPOINT MERGE PDF
-// ========================================================================
 app.post('/api/merge-pdf', upload.array('files'), async (req, res) => {
   console.log('Menerima permintaan untuk menggabungkan PDF...');
 
@@ -107,9 +104,6 @@ app.post('/api/merge-pdf', upload.array('files'), async (req, res) => {
   }
 });
 
-// ========================================================================
-// ENDPOINT SPLIT PDF
-// ========================================================================
 app.post('/api/split-pdf', upload.single('files'), async (req, res) => {
   console.log('Menerima permintaan untuk memisah PDF...');
 
@@ -205,9 +199,6 @@ app.post('/api/split-pdf', upload.single('files'), async (req, res) => {
   }
 });
 
-// ========================================================================
-// ENDPOINT COMPRESS PDF
-// ========================================================================
 app.post('/api/compress-pdf', upload.single('files'), async (req, res) => {
   console.log('Menerima permintaan untuk kompres PDF...');
 
@@ -285,9 +276,6 @@ app.post('/api/compress-pdf', upload.single('files'), async (req, res) => {
   }
 });
 
-// ========================================================================
-// ENDPOINT CONVERT TO PDF
-// ========================================================================
 app.post('/api/convert-to-pdf', upload.array('files'), (req, res) => {
   console.log('Menerima permintaan untuk konversi Gambar ke PDF...');
 
@@ -542,10 +530,6 @@ app.post('/api/pdf-to-pptx', upload.single('files'), async (req, res) => {
   }
 });
 
-
-// ========================================================================
-// ENDPOINT CONVERT FROM PDF
-// ========================================================================
 app.post('/api/convert-from-pdf', upload.single('files'), async (req, res) => {
   console.log('Menerima permintaan untuk konversi PDF ke JPG...');
 
@@ -666,9 +650,6 @@ app.post('/api/convert-from-pdf', upload.single('files'), async (req, res) => {
   }
 });
 
-// ========================================================================
-// ENDPOINT ROTATE PDF
-// ========================================================================
 app.post('/api/rotate-pdf', upload.single('files'), async (req, res) => {
   console.log('Menerima permintaan untuk memutar PDF...');
 
@@ -718,9 +699,6 @@ app.post('/api/rotate-pdf', upload.single('files'), async (req, res) => {
   }
 });
 
-// ========================================================================
-// ENDPOINT SIGN PDF
-// ========================================================================
 app.post('/api/sign-pdf', upload.single('files'), async (req, res) => {
   try {
     const { posX, posY, previewWidth, previewHeight, signature } = req.body;
@@ -752,9 +730,6 @@ app.post('/api/sign-pdf', upload.single('files'), async (req, res) => {
   }
 });
 
-// ========================================================================
-// ENDPOINT OCR PDF
-// ========================================================================
 app.post('/api/ocr-pdf', upload.single('files'), async (req, res) => {
   console.log('Menerima permintaan untuk OCR PDF dengan Gemini 3.1 Pro...');
 
@@ -804,9 +779,6 @@ app.post('/api/ocr-pdf', upload.single('files'), async (req, res) => {
   }
 });
 
-// ========================================================================
-// ENDPOINT PDF TO PDF/A
-// ========================================================================
 app.post('/api/pdf-to-pdfa', upload.single('files'), async (req, res) => {
   console.log('Menerima permintaan untuk Konversi ke PDF/A...');
 
@@ -878,10 +850,6 @@ app.post('/api/pdf-to-pdfa', upload.single('files'), async (req, res) => {
   }
 });
 
-
-// ========================================================================
-// ENDPOINT AI SUMMARIZER
-// ========================================================================
 app.post('/api/ai-summarize', upload.single('files'), async (req, res) => {
   console.log('Menerima permintaan untuk Ringkasan AI...');
 
@@ -943,9 +911,6 @@ app.post('/api/ai-summarize', upload.single('files'), async (req, res) => {
   }
 });
 
-// ========================================================================
-// ENDPOINT ORGANIZE PDF
-// ========================================================================
 app.post('/api/organize-pdf', upload.single('file'), async (req, res) => {
   console.log('Menerima permintaan untuk mengatur ulang halaman PDF...');
 
@@ -986,9 +951,6 @@ app.post('/api/organize-pdf', upload.single('file'), async (req, res) => {
   }
 });
 
-// ========================================================================
-// ENDPOINT AI TRANSLATOR
-// ========================================================================
 app.post('/api/ai-translate', upload.single('files'), async (req, res) => {
   console.log('Menerima permintaan untuk Terjemahan AI...');
 
