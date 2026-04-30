@@ -4,7 +4,7 @@ Panduan ini untuk deploy repo PDF Tools ke VPS Ubuntu menggunakan aaPanel. Struk
 
 - Frontend React + Vite ada di root project dan hasil build masuk ke `dist/`.
 - Backend Express ada di `server/server.js` dan berjalan di port `3004`.
-- URL backend di frontend diambil dari `VITE_API_URL` pada saat build. Jika tidak diisi, default-nya `http://localhost:3004/api`, yang hanya cocok untuk development lokal.
+- URL backend di frontend diambil dari `VITE_API_URL` pada saat build. Jika tidak diisi, default-nya `/api`, yang cocok untuk setup proxy di config website aaPanel.
 
 Contoh domain pada panduan ini: `pdf.example.com`. Ganti dengan domain Anda.
 
@@ -41,12 +41,14 @@ Jika command `pdftk` tidak ditemukan setelah install `pdftk-java`, coba:
 sudo apt install -y pdftk
 ```
 
-## 2. Install Node.js di aaPanel
+## 2. Install Node.js di VPS
 
 1. Buka dashboard aaPanel.
 2. Masuk ke **App Store**.
 3. Install **Node.js version manager**.
 4. Install Node.js versi 20 LTS atau minimal Node.js 18.
+
+Project ini tetap membutuhkan Node.js untuk build frontend dan menjalankan backend Express. Namun website di aaPanel akan dibuat sebagai **PHP Project**.
 
 Project ini punya `package-lock.json` di root dan di folder `server`, jadi panduan ini memakai `npm`.
 
@@ -101,22 +103,33 @@ node server.js
 
 Jika sukses, akan muncul log server berjalan di `http://localhost:3004`. Tekan `Ctrl+C` setelah pengecekan.
 
-## 5. Jalankan Backend dari aaPanel
+## 5. Jalankan Backend dengan PM2
 
-1. Buka **Website** -> **Node.js Project**.
-2. Klik **Add Node.js Project**.
-3. Isi konfigurasi:
+Karena website akan dibuat sebagai **PHP Project**, backend Node.js perlu dijalankan sebagai proses terpisah. Cara paling praktis adalah memakai PM2.
 
-   ```text
-   Project path : /www/wwwroot/pdf-tools/server
-   Project name : pdf-tools-backend
-   Startup file : server.js
-   Run command  : node server.js
-   Port         : 3004
-   Node version : Node.js 20 atau 18
-   ```
+Install PM2:
 
-4. Simpan dan pastikan status project **Running**.
+```bash
+npm install -g pm2
+```
+
+Jalankan backend:
+
+```bash
+cd /www/wwwroot/pdf-tools/server
+pm2 start server.js --name pdf-tools-backend
+pm2 save
+pm2 startup
+```
+
+Command `pm2 startup` akan menampilkan satu command tambahan. Copy dan jalankan command tersebut agar backend otomatis hidup setelah VPS restart.
+
+Cek status:
+
+```bash
+pm2 status
+pm2 logs pdf-tools-backend
+```
 
 Backend sebaiknya tidak dibuka langsung ke publik. Nanti Nginx akan meneruskan request `/api` dari domain ke `127.0.0.1:3004`.
 
@@ -135,10 +148,10 @@ Buat file `.env.production` di root project:
 nano .env.production
 ```
 
-Isi dengan URL API public. Jika memakai reverse proxy `/api` seperti panduan ini:
+Isi dengan path API yang nanti diarahkan dari config website:
 
 ```env
-VITE_API_URL=https://pdf.example.com/api
+VITE_API_URL=/api
 ```
 
 Build frontend:
@@ -153,9 +166,9 @@ Output akan berada di:
 /www/wwwroot/pdf-tools/dist
 ```
 
-## 7. Buat Website di aaPanel
+## 7. Buat PHP Project di aaPanel
 
-1. Buka **Website** -> **Add site**.
+1. Buka **Website** -> **PHP Project** atau **Add site**.
 2. Masukkan domain, misalnya `pdf.example.com`.
 3. Set document root ke:
 
@@ -163,7 +176,8 @@ Output akan berada di:
    /www/wwwroot/pdf-tools/dist
    ```
 
-4. Aktifkan SSL dari menu SSL aaPanel, misalnya Let's Encrypt.
+4. Pilih versi PHP apa saja yang tersedia. Frontend ini statis, jadi PHP tidak dipakai oleh aplikasi.
+5. Aktifkan SSL dari menu SSL aaPanel, misalnya Let's Encrypt.
 
 Karena frontend memakai React Router, tambahkan fallback SPA di konfigurasi Nginx site:
 
@@ -173,9 +187,16 @@ location / {
 }
 ```
 
-## 8. Proxy API ke Backend
+## 8. Tambahkan Backend di Config Website
 
-Di konfigurasi Nginx website aaPanel, tambahkan blok ini:
+Backend tidak dibuat dari menu project Node aaPanel. Tambahkan proxy backend langsung di konfigurasi website PHP Project.
+
+Di aaPanel:
+
+1. Buka **Website**.
+2. Pilih site `pdf.example.com`.
+3. Buka menu **Config** atau **Site Config**.
+4. Tambahkan blok Nginx ini di dalam blok `server { ... }`:
 
 ```nginx
 location /api/ {
@@ -191,7 +212,25 @@ location /api/ {
 }
 ```
 
-Jika aaPanel sudah punya blok `location /`, biarkan tetap ada dan tambahkan blok `/api/` di konfigurasi server yang sama.
+Jika aaPanel sudah punya blok `location /`, biarkan tetap ada dan tambahkan blok `/api/` di konfigurasi server yang sama. Hasil akhirnya minimal punya dua blok ini:
+
+```nginx
+location / {
+    try_files $uri $uri/ /index.html;
+}
+
+location /api/ {
+    proxy_pass http://127.0.0.1:3004/api/;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    client_max_body_size 60M;
+    proxy_read_timeout 180s;
+    proxy_send_timeout 180s;
+}
+```
 
 Reload Nginx dari aaPanel atau SSH:
 
@@ -209,7 +248,7 @@ Untuk setup reverse proxy, cukup buka port web:
 
 Tidak perlu membuka port `3004` ke publik. Backend cukup diakses internal oleh Nginx melalui `127.0.0.1:3004`.
 
-Jika Anda memilih tidak memakai reverse proxy dan frontend memanggil `https://domain:3004/api`, maka port `3004` harus dibuka dan konfigurasi CORS di `server/server.js` harus disesuaikan. Cara reverse proxy lebih direkomendasikan.
+Jika Anda memilih tidak memakai proxy di config website dan frontend memanggil `https://domain:3004/api`, maka port `3004` harus dibuka dan konfigurasi CORS di `server/server.js` harus disesuaikan. Cara proxy `/api` di PHP Project lebih direkomendasikan.
 
 ## 10. Update Setelah Ada Perubahan Repo
 
@@ -224,7 +263,11 @@ cd /www/wwwroot/pdf-tools/server
 npm install
 ```
 
-Lalu restart Node.js Project `pdf-tools-backend` dari aaPanel.
+Lalu restart backend:
+
+```bash
+pm2 restart pdf-tools-backend
+```
 
 ## Troubleshooting
 
@@ -233,7 +276,7 @@ Lalu restart Node.js Project `pdf-tools-backend` dari aaPanel.
 Pastikan saat build nilai `VITE_API_URL` benar:
 
 ```env
-VITE_API_URL=https://pdf.example.com/api
+VITE_API_URL=/api
 ```
 
 Setelah mengubah `.env.production`, jalankan ulang:
@@ -291,4 +334,8 @@ Pastikan file `server/.env` ada dan berisi:
 GOOGLE_AI_API_KEY=isi_api_key_gemini_anda
 ```
 
-Lalu restart Node.js Project backend dari aaPanel.
+Lalu restart backend:
+
+```bash
+pm2 restart pdf-tools-backend
+```
