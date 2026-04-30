@@ -56,7 +56,7 @@ export default function SignPdfTool() {
     abortControllerRef.current = new AbortController();
 
     const formData = new FormData();
-    formData.append('files[0]', files[0]);
+    formData.append('files', files[0]);
     formData.append('signature', signatureText);
 
     const handleProgress = (event: AxiosProgressEvent) => {

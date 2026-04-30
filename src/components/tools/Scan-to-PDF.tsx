@@ -64,7 +64,7 @@ export default function ScanToPdfTool() {
 
     const formData = new FormData();
     files.forEach((file, index) => {
-      formData.append(`files[${index}]`, file);
+      formData.append(`files`, file);
     });
 
     const handleProgress = (event: AxiosProgressEvent) => {

@@ -11,7 +11,14 @@ const os = require('os')
 const { spawn } = require('child_process');
 const crypto = require('crypto');
 const libre = require('libreoffice-convert');
-const pdf = require('pdf-parse');
+const { PDFParse } = require('pdf-parse');
+const parsePdfText = async (buffer) => {
+  const parser = new PDFParse({ data: buffer });
+  return await parser.getText();
+};
+const XLSX = require('xlsx');
+const PptxGenJS = require('pptxgenjs');
+const { Document, Packer, Paragraph, TextRun, HeadingLevel } = require('docx');
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 require('dotenv').config();
 const normalizePath = (p) => p.replace(/\\/g, '/');
@@ -360,7 +367,9 @@ app.post('/api/convert-office-to-pdf', upload.single('files'), async (req, res) 
   }
 });
 
+// PDF -> Word: extract text via pdf-parse, then build a real DOCX with docx library
 app.post('/api/pdf-to-word', upload.single('files'), async (req, res) => {
+  console.log('Menerima permintaan untuk konversi PDF ke Word...');
   if (!req.file) return res.status(400).send('Harap unggah 1 file PDF.');
 
   const cleanup = () => { if (req.file) safeUnlink(req.file.path); };
@@ -369,24 +378,38 @@ app.post('/api/pdf-to-word', upload.single('files'), async (req, res) => {
 
   try {
     const fileBuffer = await fsPromises.readFile(req.file.path);
-    libre.convert(fileBuffer, '.docx', undefined, (err, done) => {
-      if (err) {
-        console.error('LibreOffice Error (PDF to Word):', err);
-        if (!res.headersSent) return res.status(500).send('Gagal mengonversi ke Word.');
-      }
-      if (!res.headersSent) {
-        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-        res.setHeader('Content-Disposition', 'attachment; filename=Hasil-Ke-Word.docx');
-        res.send(done);
-      }
+    const data = await parsePdfText(fileBuffer);
+    const rawText = (data.text || '').replace(/\r/g, '');
+    const paragraphs = rawText.split(/\n{1,}/).map((line) =>
+      new Paragraph({
+        children: [new TextRun({ text: line || ' ', size: 24 })],
+      })
+    );
+
+    if (paragraphs.length === 0) {
+      paragraphs.push(new Paragraph({
+        children: [new TextRun({ text: '(Dokumen PDF tidak mengandung teks digital. Coba gunakan OCR terlebih dahulu.)', italics: true, size: 22 })],
+      }));
+    }
+
+    const doc = new Document({
+      sections: [{ properties: {}, children: paragraphs }],
     });
+
+    const buffer = await Packer.toBuffer(doc);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    res.setHeader('Content-Disposition', 'attachment; filename=Hasil-Ke-Word.docx');
+    res.send(buffer);
+    console.log('PDF berhasil dikonversi ke Word dan dikirim.');
   } catch (error) {
-    console.error('Error reading file for LibreOffice:', error);
-    if (!res.headersSent) res.status(500).send('Terjadi kesalahan saat memproses file.');
+    console.error('Error converting PDF to Word:', error);
+    if (!res.headersSent) res.status(500).send('Gagal mengonversi PDF ke Word. Pastikan PDF berisi teks yang dapat diekstrak.');
   }
 });
 
+// PDF -> Excel: extract text via pdf-parse, then build XLSX with rows for each line
 app.post('/api/pdf-to-excel', upload.single('files'), async (req, res) => {
+  console.log('Menerima permintaan untuk konversi PDF ke Excel...');
   if (!req.file) return res.status(400).send('Harap unggah 1 file PDF.');
 
   const cleanup = () => { if (req.file) safeUnlink(req.file.path); };
@@ -395,46 +418,129 @@ app.post('/api/pdf-to-excel', upload.single('files'), async (req, res) => {
 
   try {
     const fileBuffer = await fsPromises.readFile(req.file.path);
-    libre.convert(fileBuffer, '.xlsx', undefined, (err, done) => {
-      if (err) {
-        console.error('LibreOffice Error (PDF to Excel):', err);
-        if (!res.headersSent) return res.status(500).send('Gagal mengonversi ke Excel.');
-      }
-      if (!res.headersSent) {
-        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.setHeader('Content-Disposition', 'attachment; filename=Hasil-Ke-Excel.xlsx');
-        res.send(done);
-      }
-    });
+    const data = await parsePdfText(fileBuffer);
+    const rawText = (data.text || '').replace(/\r/g, '');
+    const lines = rawText.split(/\n+/).map(l => l.trim()).filter(l => l.length > 0);
+
+    const rows = [['Halaman', 'Konten']];
+    if (lines.length === 0) {
+      rows.push(['1', '(Dokumen PDF tidak mengandung teks digital. Coba gunakan OCR terlebih dahulu.)']);
+    } else {
+      lines.forEach((line, i) => {
+        // Heuristic: split by 2+ spaces or tabs into columns
+        const cols = line.split(/\t|\s{2,}/).filter(c => c.length > 0);
+        if (cols.length > 1) {
+          rows.push([String(i + 1), ...cols]);
+        } else {
+          rows.push([String(i + 1), line]);
+        }
+      });
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+    const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename=Hasil-Ke-Excel.xlsx');
+    res.send(buffer);
+    console.log('PDF berhasil dikonversi ke Excel dan dikirim.');
   } catch (error) {
-    console.error('Error reading file for LibreOffice:', error);
-    if (!res.headersSent) res.status(500).send('Terjadi kesalahan saat memproses file.');
+    console.error('Error converting PDF to Excel:', error);
+    if (!res.headersSent) res.status(500).send('Gagal mengonversi PDF ke Excel.');
   }
 });
 
+// PDF -> PPTX: render each PDF page to JPG via Ghostscript, then place each as a slide
 app.post('/api/pdf-to-pptx', upload.single('files'), async (req, res) => {
+  console.log('Menerima permintaan untuk konversi PDF ke PowerPoint...');
   if (!req.file) return res.status(400).send('Harap unggah 1 file PDF.');
 
-  const cleanup = () => { if (req.file) safeUnlink(req.file.path); };
-  res.on('finish', cleanup);
-  res.on('close', cleanup);
+  const tempId = crypto.randomBytes(16).toString('hex');
+  const inputPath = req.file.path;
+  const outputPathPattern = path.join(os.tmpdir(), `pptx-${tempId}-%d.jpg`);
+  const gsCommand = process.platform === 'win32' ? 'gswin64c' : 'gs';
+  let pageCount = 0;
+
+  const cleanupFiles = () => {
+    safeUnlink(inputPath);
+    if (pageCount > 0) {
+      for (let i = 1; i <= pageCount; i++) {
+        safeUnlink(path.join(os.tmpdir(), `pptx-${tempId}-${i}.jpg`));
+      }
+    }
+  };
+  res.on('finish', cleanupFiles);
+  res.on('close', cleanupFiles);
 
   try {
-    const fileBuffer = await fsPromises.readFile(req.file.path);
-    libre.convert(fileBuffer, '.pptx', undefined, (err, done) => {
-      if (err) {
-        console.error('LibreOffice Error (PDF to PPTX):', err);
-        if (!res.headersSent) return res.status(500).send('Gagal mengonversi ke PowerPoint.');
+    const fileBuffer = await fsPromises.readFile(inputPath);
+    const pdfDoc = await PDFDocument.load(fileBuffer, { ignoreEncryption: true });
+    pageCount = pdfDoc.getPageCount();
+
+    if (pageCount > 100) {
+      return res.status(400).send('File terlalu panjang. Maksimal 100 halaman.');
+    }
+
+    const args = [
+      '-sDEVICE=jpeg',
+      '-r150',
+      '-dNOPAUSE',
+      '-dBATCH',
+      '-dQUIET',
+      `-sOutputFile=${normalizePath(outputPathPattern)}`,
+      normalizePath(inputPath)
+    ];
+
+    const gsProcess = spawn(gsCommand, args);
+    let gsErr = '';
+    gsProcess.stderr.on('data', d => { gsErr += d.toString(); });
+
+    gsProcess.on('close', async (code) => {
+      if (code !== 0) {
+        console.error('Ghostscript error (pdf-to-pptx):', gsErr);
+        if (!res.headersSent) return res.status(500).send('Gagal merender halaman PDF. Pastikan Ghostscript terinstal.');
+        return;
       }
-      if (!res.headersSent) {
-        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.presentationml.presentation');
-        res.setHeader('Content-Disposition', 'attachment; filename=Hasil-Ke-PowerPoint.pptx');
-        res.send(done);
+
+      try {
+        const pptx = new PptxGenJS();
+        pptx.layout = 'LAYOUT_WIDE'; // 13.33 x 7.5 inches
+        const slideW = pptx.width || 13.33;
+        const slideH = pptx.height || 7.5;
+
+        for (let i = 1; i <= pageCount; i++) {
+          const imgPath = path.join(os.tmpdir(), `pptx-${tempId}-${i}.jpg`);
+          if (!fs.existsSync(imgPath)) continue;
+          const slide = pptx.addSlide();
+          slide.addImage({
+            path: imgPath,
+            x: 0, y: 0, w: slideW, h: slideH,
+            sizing: { type: 'contain', w: slideW, h: slideH }
+          });
+        }
+
+        const buffer = await pptx.write({ outputType: 'nodebuffer' });
+        if (!res.headersSent) {
+          res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.presentationml.presentation');
+          res.setHeader('Content-Disposition', 'attachment; filename=Hasil-Ke-PowerPoint.pptx');
+          res.send(buffer);
+          console.log('PDF berhasil dikonversi ke PowerPoint dan dikirim.');
+        }
+      } catch (err) {
+        console.error('Error building PPTX:', err);
+        if (!res.headersSent) res.status(500).send('Gagal membuat file PowerPoint.');
       }
     });
+
+    gsProcess.on('error', (err) => {
+      console.error('Ghostscript spawn error:', err);
+      if (!res.headersSent) res.status(500).send('Ghostscript tidak ditemukan di server.');
+    });
   } catch (error) {
-    console.error('Error reading file for LibreOffice:', error);
-    if (!res.headersSent) res.status(500).send('Terjadi kesalahan saat memproses file.');
+    console.error('Error converting PDF to PPTX:', error);
+    if (!res.headersSent) res.status(500).send('Gagal mengonversi PDF ke PowerPoint.');
   }
 });
 
@@ -771,7 +877,7 @@ app.post('/api/ocr-pdf', upload.single('files'), async (req, res) => {
       return res.status(400).send('File terlalu besar untuk diproses AI. Maksimal 20MB.');
     }
 
-    const model = genAI.getGenerativeModel({ model: "gemini-3.1-pro-preview" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     const prompt = "Tolong lakukan OCR pada dokumen PDF ini. Ekstrak semua teks secara akurat, pertahankan urutan dan formatnya sebaik mungkin. Berikan hasilnya hanya berupa teks yang diekstrak.";
 
@@ -980,10 +1086,10 @@ app.post('/api/ai-summarize', upload.single('files'), async (req, res) => {
     if (fileBuffer.length > 20 * 1024 * 1024) {
       return res.status(400).send('File terlalu besar untuk diproses AI. Maksimal 20MB.');
     }
-    const data = await pdf(fileBuffer);
+    const data = await parsePdfText(fileBuffer);
     let text = data.text;
 
-    const model = genAI.getGenerativeModel({ model: "gemini-3.1-pro-preview" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     let result;
 
     if (!text || text.trim().length < 50) {
@@ -1115,10 +1221,10 @@ app.post('/api/ai-translate', upload.single('files'), async (req, res) => {
     if (fileBuffer.length > 20 * 1024 * 1024) {
       return res.status(400).send('File terlalu besar untuk diproses AI. Maksimal 20MB.');
     }
-    const data = await pdf(fileBuffer);
+    const data = await parsePdfText(fileBuffer);
     let text = data.text;
 
-    const model = genAI.getGenerativeModel({ model: "gemini-3.1-pro-preview" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
     let result;
 
     if (!text || text.trim().length < 20) {

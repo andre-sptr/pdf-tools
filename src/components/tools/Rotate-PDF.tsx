@@ -42,7 +42,7 @@ export default function RotatePdfTool() {
     setUploadProgress(0);
 
     const formData = new FormData();
-    formData.append('files[0]', files[0]);
+    formData.append('files', files[0]);
     formData.append('angle', angle);
 
     const handleProgress = (event: AxiosProgressEvent) => {
