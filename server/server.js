@@ -5,6 +5,8 @@ const PDFKitDocument = require('pdfkit');
 const cors = require('cors');
 const archiver = require('archiver');
 const fs = require('fs');
+const { exec } = require('child_process');
+const xlsx = require('xlsx');
 const fsPromises = fs.promises;
 const path = require('path');
 const os = require('os')
@@ -16,9 +18,6 @@ const parsePdfText = async (buffer) => {
   const parser = new PDFParse({ data: buffer });
   return await parser.getText();
 };
-const XLSX = require('xlsx');
-const PptxGenJS = require('pptxgenjs');
-const { Document, Packer, Paragraph, TextRun, HeadingLevel } = require('docx');
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 require('dotenv').config();
 const normalizePath = (p) => p.replace(/\\/g, '/');
@@ -361,172 +360,212 @@ app.post('/api/pdf-to-word', upload.single('files'), async (req, res) => {
   console.log('Menerima permintaan untuk konversi PDF ke Word...');
   if (!req.file) return res.status(400).send('Harap unggah 1 file PDF.');
 
-  const cleanup = () => { if (req.file) safeUnlink(req.file.path); };
+  const tempId = crypto.randomBytes(16).toString('hex');
+  const inputPath = req.file.path;
+  const outputDir = os.tmpdir();
+  const expectedOutput = path.join(outputDir, path.basename(inputPath, '.pdf') + '.docx');
+
+  const cleanup = () => {
+    safeUnlink(inputPath);
+    safeUnlink(expectedOutput);
+  };
+
   res.on('finish', cleanup);
   res.on('close', cleanup);
 
+  const loCommand = process.platform === 'win32' ? 'soffice' : 'libreoffice';
+  let responseSent = false;
+
   try {
-    const fileBuffer = await fsPromises.readFile(req.file.path);
-    const data = await parsePdfText(fileBuffer);
-    const rawText = (data.text || '').replace(/\r/g, '');
-    const paragraphs = rawText.split(/\n{1,}/).map((line) =>
-      new Paragraph({
-        children: [new TextRun({ text: line || ' ', size: 24 })],
-      })
-    );
+    const args = [
+      '--headless',
+      '--infilter=writer_pdf_import',
+      '--convert-to', 'docx',
+      '--outdir', normalizePath(outputDir),
+      normalizePath(inputPath)
+    ];
 
-    if (paragraphs.length === 0) {
-      paragraphs.push(new Paragraph({
-        children: [new TextRun({ text: '(Dokumen PDF tidak mengandung teks digital. Coba gunakan OCR terlebih dahulu.)', italics: true, size: 22 })],
-      }));
-    }
+    const loProcess = spawn(loCommand, args);
+    let stderr = '';
 
-    const doc = new Document({
-      sections: [{ properties: {}, children: paragraphs }],
+    loProcess.stderr.on('data', (data) => {
+      stderr += data.toString();
     });
 
-    const buffer = await Packer.toBuffer(doc);
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-    res.setHeader('Content-Disposition', 'attachment; filename=Hasil-Ke-Word.docx');
-    res.send(buffer);
-    console.log('PDF berhasil dikonversi ke Word dan dikirim.');
+    loProcess.on('close', async (code) => {
+      if (responseSent) return;
+      responseSent = true;
+
+      if (code !== 0) {
+        console.error('LibreOffice Error:', stderr);
+        return res.status(500).send('Gagal konversi PDF ke Word. Pastikan LibreOffice terinstal.');
+      }
+
+      if (!fs.existsSync(expectedOutput)) {
+        return res.status(500).send('File output tidak ditemukan.');
+      }
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      res.setHeader('Content-Disposition', 'attachment; filename=Hasil-Ke-Word.docx');
+
+      const readStream = fs.createReadStream(expectedOutput);
+      readStream.pipe(res);
+
+      readStream.on('end', () => console.log('PDF ke Word berhasil.'));
+      readStream.on('error', (err) => {
+        console.error('Stream Error:', err);
+        if (!res.headersSent) res.status(500).send('Gagal mengirim file.');
+      });
+    });
+
+    loProcess.on('error', (err) => {
+      if (responseSent) return;
+      responseSent = true;
+      console.error('LibreOffice tidak ditemukan:', err);
+      res.status(500).send('LibreOffice tidak terinstal di server.');
+    });
+
   } catch (error) {
     console.error('Error converting PDF to Word:', error);
-    if (!res.headersSent) res.status(500).send('Gagal mengonversi PDF ke Word. Pastikan PDF berisi teks yang dapat diekstrak.');
+    if (!responseSent) res.status(500).send('Gagal mengonversi PDF ke Word.');
   }
 });
 
 app.post('/api/pdf-to-excel', upload.single('files'), async (req, res) => {
-  console.log('Menerima permintaan untuk konversi PDF ke Excel...');
+  console.log('Menerima permintaan konversi PDF ke Excel (Tabula Direct Execute)...');
+
   if (!req.file) return res.status(400).send('Harap unggah 1 file PDF.');
 
-  const cleanup = () => { if (req.file) safeUnlink(req.file.path); };
+  const inputPath = req.file.path;
+  const outputDir = os.tmpdir();
+  const tempId = crypto.randomBytes(8).toString('hex');
+  const csvOutput = path.join(outputDir, `${tempId}.csv`);
+  const excelOutput = path.join(outputDir, `${tempId}.xlsx`);
+
+  const cleanup = () => {
+    safeUnlink(inputPath);
+    safeUnlink(csvOutput);
+    safeUnlink(excelOutput);
+  };
   res.on('finish', cleanup);
   res.on('close', cleanup);
 
   try {
-    const fileBuffer = await fsPromises.readFile(req.file.path);
-    const data = await parsePdfText(fileBuffer);
-    const rawText = (data.text || '').replace(/\r/g, '');
-    const lines = rawText.split(/\n+/).map(l => l.trim()).filter(l => l.length > 0);
+    const tabulaJarPath = path.join(__dirname, 'node_modules', 'tabula-js', 'lib', 'tabula-java.jar');
+    const command = `java -jar "${tabulaJarPath}" -p all -f CSV -o "${csvOutput}" "${inputPath}"`;
 
-    const rows = [['Halaman', 'Konten']];
-    if (lines.length === 0) {
-      rows.push(['1', '(Dokumen PDF tidak mengandung teks digital. Coba gunakan OCR terlebih dahulu.)']);
-    } else {
-      lines.forEach((line, i) => {
-        const cols = line.split(/\t|\s{2,}/).filter(c => c.length > 0);
-        if (cols.length > 1) {
-          rows.push([String(i + 1), ...cols]);
-        } else {
-          rows.push([String(i + 1), line]);
+    exec(command, (error, stdout, stderr) => {
+      if (!fs.existsSync(csvOutput)) {
+        console.error('Tabula gagal mengekstrak tabel:', stderr || error);
+        return res.status(500).send('Gagal mengekstrak teks. Pastikan dokumen PDF bukan gambar hasil scan.');
+      }
+
+      try {
+        const csvData = fs.readFileSync(csvOutput, 'utf8');
+
+        if (!csvData || csvData.trim() === '') {
+          return res.status(400).send('Tidak ada tabel yang terdeteksi di dalam dokumen ini.');
         }
-      });
-    }
 
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
-    const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+        const workbook = xlsx.read(csvData, { type: 'string' });
+        xlsx.writeFile(workbook, excelOutput);
 
-    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', 'attachment; filename=Hasil-Ke-Excel.xlsx');
-    res.send(buffer);
-    console.log('PDF berhasil dikonversi ke Excel dan dikirim.');
-  } catch (error) {
-    console.error('Error converting PDF to Excel:', error);
-    if (!res.headersSent) res.status(500).send('Gagal mengonversi PDF ke Excel.');
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename=Hasil-Ke-Excel.xlsx');
+
+        const readStream = fs.createReadStream(excelOutput);
+        readStream.pipe(res);
+
+        readStream.on('end', () => console.log('PDF ke Excel berhasil dikirim!'));
+        readStream.on('error', (err) => {
+          console.error('Stream Error:', err);
+          if (!res.headersSent) res.status(500).send('Gagal mengirim file Excel.');
+        });
+
+      } catch (excelError) {
+        console.error('Error saat merakit Excel:', excelError);
+        if (!res.headersSent) res.status(500).send('Gagal merakit data menjadi file Excel.');
+      }
+    });
+
+  } catch (sysError) {
+    console.error('Sistem Error:', sysError);
+    if (!res.headersSent) res.status(500).send('Terjadi kesalahan pada server saat memproses file.');
   }
 });
 
 app.post('/api/pdf-to-pptx', upload.single('files'), async (req, res) => {
   console.log('Menerima permintaan untuk konversi PDF ke PowerPoint...');
+
   if (!req.file) return res.status(400).send('Harap unggah 1 file PDF.');
 
   const tempId = crypto.randomBytes(16).toString('hex');
   const inputPath = req.file.path;
-  const outputPathPattern = path.join(os.tmpdir(), `pptx-${tempId}-%d.jpg`);
-  const gsCommand = process.platform === 'win32' ? 'gswin64c' : 'gs';
-  let pageCount = 0;
+  const outputDir = os.tmpdir();
+  const expectedOutput = path.join(outputDir, path.basename(inputPath, '.pdf') + '.pptx');
 
-  const cleanupFiles = () => {
+  const cleanup = () => {
     safeUnlink(inputPath);
-    if (pageCount > 0) {
-      for (let i = 1; i <= pageCount; i++) {
-        safeUnlink(path.join(os.tmpdir(), `pptx-${tempId}-${i}.jpg`));
-      }
-    }
+    safeUnlink(expectedOutput);
   };
-  res.on('finish', cleanupFiles);
-  res.on('close', cleanupFiles);
+
+  res.on('finish', cleanup);
+  res.on('close', cleanup);
+
+  const loCommand = process.platform === 'win32' ? 'soffice' : 'libreoffice';
+  let responseSent = false;
 
   try {
-    const fileBuffer = await fsPromises.readFile(inputPath);
-    const pdfDoc = await PDFDocument.load(fileBuffer, { ignoreEncryption: true });
-    pageCount = pdfDoc.getPageCount();
-
-    if (pageCount > 100) {
-      return res.status(400).send('File terlalu panjang. Maksimal 100 halaman.');
-    }
-
     const args = [
-      '-sDEVICE=jpeg',
-      '-r150',
-      '-dNOPAUSE',
-      '-dBATCH',
-      '-dQUIET',
-      `-sOutputFile=${normalizePath(outputPathPattern)}`,
+      '--headless',
+      '--infilter=impress_pdf_import',
+      '--convert-to', 'pptx',
+      '--outdir', normalizePath(outputDir),
       normalizePath(inputPath)
     ];
 
-    const gsProcess = spawn(gsCommand, args);
-    let gsErr = '';
-    gsProcess.stderr.on('data', d => { gsErr += d.toString(); });
+    const loProcess = spawn(loCommand, args);
+    let stderr = '';
 
-    gsProcess.on('close', async (code) => {
+    loProcess.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+
+    loProcess.on('close', async (code) => {
+      if (responseSent) return;
+      responseSent = true;
       if (code !== 0) {
-        console.error('Ghostscript error (pdf-to-pptx):', gsErr);
-        if (!res.headersSent) return res.status(500).send('Gagal merender halaman PDF. Pastikan Ghostscript terinstal.');
-        return;
+        console.error('LibreOffice Error:', stderr);
+        return res.status(500).send('Gagal konversi PDF ke PowerPoint. Pastikan LibreOffice terinstal.');
       }
 
-      try {
-        const pptx = new PptxGenJS();
-        pptx.layout = 'LAYOUT_WIDE';
-        const slideW = pptx.width || 13.33;
-        const slideH = pptx.height || 7.5;
-
-        for (let i = 1; i <= pageCount; i++) {
-          const imgPath = path.join(os.tmpdir(), `pptx-${tempId}-${i}.jpg`);
-          if (!fs.existsSync(imgPath)) continue;
-          const slide = pptx.addSlide();
-          slide.addImage({
-            path: imgPath,
-            x: 0, y: 0, w: slideW, h: slideH,
-            sizing: { type: 'contain', w: slideW, h: slideH }
-          });
-        }
-
-        const buffer = await pptx.write({ outputType: 'nodebuffer' });
-        if (!res.headersSent) {
-          res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.presentationml.presentation');
-          res.setHeader('Content-Disposition', 'attachment; filename=Hasil-Ke-PowerPoint.pptx');
-          res.send(buffer);
-          console.log('PDF berhasil dikonversi ke PowerPoint dan dikirim.');
-        }
-      } catch (err) {
-        console.error('Error building PPTX:', err);
-        if (!res.headersSent) res.status(500).send('Gagal membuat file PowerPoint.');
+      if (!fs.existsSync(expectedOutput)) {
+        return res.status(500).send('File output tidak ditemukan.');
       }
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.presentationml.presentation');
+      res.setHeader('Content-Disposition', 'attachment; filename=Hasil-Ke-PowerPoint.pptx');
+
+      const readStream = fs.createReadStream(expectedOutput);
+      readStream.pipe(res);
+
+      readStream.on('end', () => console.log('PDF ke PowerPoint berhasil.'));
+      readStream.on('error', (err) => {
+        console.error('Stream Error:', err);
+        if (!res.headersSent) res.status(500).send('Gagal mengirim file.');
+      });
     });
 
-    gsProcess.on('error', (err) => {
-      console.error('Ghostscript spawn error:', err);
-      if (!res.headersSent) res.status(500).send('Ghostscript tidak ditemukan di server.');
+    loProcess.on('error', (err) => {
+      if (responseSent) return;
+      responseSent = true;
+      console.error('LibreOffice tidak ditemukan:', err);
+      res.status(500).send('LibreOffice tidak terinstal di server.');
     });
+
   } catch (error) {
-    console.error('Error converting PDF to PPTX:', error);
-    if (!res.headersSent) res.status(500).send('Gagal mengonversi PDF ke PowerPoint.');
+    console.error('Error converting PDF to PowerPoint:', error);
+    if (!responseSent) res.status(500).send('Gagal mengonversi PDF ke PowerPoint.');
   }
 });
 
