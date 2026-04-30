@@ -153,7 +153,6 @@ app.post('/api/split-pdf', upload.single('files'), async (req, res) => {
 
       if (range.includes('-')) {
         const parts = range.split('-');
-        // Validate format: harus ada 2 bagian
         if (parts.length !== 2) {
           console.warn(`Format rentang tidak valid: ${range}`);
           continue;
@@ -367,7 +366,6 @@ app.post('/api/convert-office-to-pdf', upload.single('files'), async (req, res) 
   }
 });
 
-// PDF -> Word: extract text via pdf-parse, then build a real DOCX with docx library
 app.post('/api/pdf-to-word', upload.single('files'), async (req, res) => {
   console.log('Menerima permintaan untuk konversi PDF ke Word...');
   if (!req.file) return res.status(400).send('Harap unggah 1 file PDF.');
@@ -407,7 +405,6 @@ app.post('/api/pdf-to-word', upload.single('files'), async (req, res) => {
   }
 });
 
-// PDF -> Excel: extract text via pdf-parse, then build XLSX with rows for each line
 app.post('/api/pdf-to-excel', upload.single('files'), async (req, res) => {
   console.log('Menerima permintaan untuk konversi PDF ke Excel...');
   if (!req.file) return res.status(400).send('Harap unggah 1 file PDF.');
@@ -427,7 +424,6 @@ app.post('/api/pdf-to-excel', upload.single('files'), async (req, res) => {
       rows.push(['1', '(Dokumen PDF tidak mengandung teks digital. Coba gunakan OCR terlebih dahulu.)']);
     } else {
       lines.forEach((line, i) => {
-        // Heuristic: split by 2+ spaces or tabs into columns
         const cols = line.split(/\t|\s{2,}/).filter(c => c.length > 0);
         if (cols.length > 1) {
           rows.push([String(i + 1), ...cols]);
@@ -452,7 +448,6 @@ app.post('/api/pdf-to-excel', upload.single('files'), async (req, res) => {
   }
 });
 
-// PDF -> PPTX: render each PDF page to JPG via Ghostscript, then place each as a slide
 app.post('/api/pdf-to-pptx', upload.single('files'), async (req, res) => {
   console.log('Menerima permintaan untuk konversi PDF ke PowerPoint...');
   if (!req.file) return res.status(400).send('Harap unggah 1 file PDF.');
@@ -506,7 +501,7 @@ app.post('/api/pdf-to-pptx', upload.single('files'), async (req, res) => {
 
       try {
         const pptx = new PptxGenJS();
-        pptx.layout = 'LAYOUT_WIDE'; // 13.33 x 7.5 inches
+        pptx.layout = 'LAYOUT_WIDE';
         const slideW = pptx.width || 13.33;
         const slideH = pptx.height || 7.5;
 
@@ -1070,36 +1065,37 @@ app.post('/api/ai-summarize', upload.single('files'), async (req, res) => {
 // ========================================================================
 // ENDPOINT ORGANIZE PDF
 // ========================================================================
-app.post('/api/organize-pdf', upload.array('files'), async (req, res) => {
-  console.log('Menerima permintaan untuk mengatur ulang PDF...');
+app.post('/api/organize-pdf', upload.single('file'), async (req, res) => {
+  console.log('Menerima permintaan untuk mengatur ulang halaman PDF...');
 
-  if (!req.files || req.files.length === 0) {
-    return res.status(400).send('Harap unggah minimal 1 file PDF.');
+  if (!req.file) {
+    return res.status(400).send('Harap unggah 1 file PDF.');
+  }
+
+  if (!req.body.pageOrder) {
+    return res.status(400).send('Urutan halaman (pageOrder) tidak ditemukan.');
   }
 
   const cleanup = () => {
-    req.files.forEach(file => safeUnlink(file.path));
+    safeUnlink(req.file.path);
   };
   res.on('finish', cleanup);
   res.on('close', cleanup);
 
   try {
+    const pageOrder = JSON.parse(req.body.pageOrder);
+    const fileBuffer = await fsPromises.readFile(req.file.path);
+    const pdfDoc = await PDFDocument.load(fileBuffer);
     const organizedPdf = await PDFDocument.create();
-
-    for (const file of req.files) {
-      const fileBuffer = await fsPromises.readFile(file.path);
-      const pdfDoc = await PDFDocument.load(fileBuffer);
-      const copiedPages = await organizedPdf.copyPages(pdfDoc, pdfDoc.getPageIndices());
-      copiedPages.forEach((page) => organizedPdf.addPage(page));
-    }
-
+    const copiedPages = await organizedPdf.copyPages(pdfDoc, pageOrder);
+    copiedPages.forEach((page) => organizedPdf.addPage(page));
     const organizedPdfBytes = await organizedPdf.save();
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'attachment; filename=Hasil-Atur-PDFTools.pdf');
     res.send(Buffer.from(organizedPdfBytes));
 
-    console.log('PDF berhasil diatur dan dikirim.');
+    console.log('Halaman PDF berhasil diatur ulang dan dikirim.');
 
   } catch (error) {
     console.error('Error saat mengatur PDF:', error);
