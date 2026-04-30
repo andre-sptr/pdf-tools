@@ -12,7 +12,6 @@ import ConvertToPdfTool from '@/components/tools/ConvertTo-PDF';
 import ConvertFromPdfTool from '@/components/tools/ConvertFrom-PDF';
 import RotatePdfTool from '@/components/tools/Rotate-PDF';
 import OrganizePdfTool from '@/components/tools/Organize-PDF';
-import RepairPdfTool from '@/components/tools/Repair-PDF';
 import WordToPdfTool from '@/components/tools/Word-to-PDF';
 import ExcelToPdfTool from '@/components/tools/Excel-to-PDF';
 import PptToPdfTool from '@/components/tools/PowerPoint-to-PDF';
@@ -45,7 +44,6 @@ const toolComponents: Record<string, JSX.Element> = {
   'convert-from-pdf': <ConvertFromPdfTool />,
   'rotate-pdf': <RotatePdfTool />,
   'organize-pdf': <OrganizePdfTool />,
-  'repair-pdf': <RepairPdfTool />,
   'word-to-pdf': <WordToPdfTool />,
   'excel-to-pdf': <ExcelToPdfTool />,
   'ppt-to-pdf': <PptToPdfTool />,

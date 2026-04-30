@@ -107,13 +107,6 @@ export const tools: Tool[] = [
     icon: ArrowUpDown,
     category: 'edit',
   },
-  {
-    slug: 'repair-pdf',
-    title: 'Perbaiki PDF',
-    description: 'Perbaiki file PDF yang rusak atau tidak bisa dibuka dengan mudah.',
-    icon: Wrench,
-    category: 'edit',
-  },
 
   // ===================== KONVERSI KE PDF =====================
   {

@@ -1110,39 +1110,6 @@ app.post('/api/organize-pdf', upload.array('files'), async (req, res) => {
 });
 
 // ========================================================================
-// ENDPOINT REPAIR PDF
-// ========================================================================
-app.post('/api/repair-pdf', upload.single('files'), async (req, res) => {
-  console.log('Menerima permintaan untuk memperbaiki PDF...');
-
-  if (!req.file) {
-    return res.status(400).send('Harap unggah file PDF.');
-  }
-
-  const cleanup = () => { if (req.file) safeUnlink(req.file.path); };
-  res.on('finish', cleanup);
-  res.on('close', cleanup);
-
-  try {
-    const fileBuffer = await fsPromises.readFile(req.file.path);
-    const pdfDoc = await PDFDocument.load(fileBuffer, { ignoreEncryption: true });
-    const repairedBytes = await pdfDoc.save();
-
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'attachment; filename=Hasil-Perbaiki-PDFTools.pdf');
-    res.send(Buffer.from(repairedBytes));
-
-    console.log('PDF berhasil diperbaiki dan dikirim.');
-
-  } catch (error) {
-    console.error('Error saat memperbaiki PDF:', error);
-    if (!res.headersSent) {
-      res.status(500).send('Gagal memperbaiki PDF. Kerusakan mungkin terlalu parah.');
-    }
-  }
-});
-
-// ========================================================================
 // ENDPOINT AI TRANSLATOR
 // ========================================================================
 app.post('/api/ai-translate', upload.single('files'), async (req, res) => {
