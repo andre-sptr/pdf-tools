@@ -715,81 +715,36 @@ app.post('/api/rotate-pdf', upload.single('files'), async (req, res) => {
 });
 
 // ========================================================================
-// ENDPOINT UNLOCK PDF
-// ========================================================================
-app.post('/api/unlock-pdf', upload.single('files'), async (req, res) => {
-  console.log('Menerima permintaan untuk buka kunci PDF...');
-
-  if (!req.file) {
-    return res.status(400).send('Harap unggah file PDF.');
-  }
-
-  const cleanup = () => { if (req.file) safeUnlink(req.file.path); };
-  res.on('finish', cleanup);
-  res.on('close', cleanup);
-
-  try {
-    const fileBuffer = await fsPromises.readFile(req.file.path);
-    const pdfDoc = await PDFDocument.load(fileBuffer, {
-      password: req.body.password || '',
-    });
-
-    const unlockedPdfBytes = await pdfDoc.save();
-
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'attachment; filename=Hasil-Buka-Kunci.pdf');
-    res.send(Buffer.from(unlockedPdfBytes));
-
-  } catch (error) {
-    console.error('Error saat buka kunci PDF:', error);
-    if (!res.headersSent) {
-      res.status(500).send('Gagal membuka kunci. Password mungkin salah.');
-    }
-  }
-});
-
-// ========================================================================
 // ENDPOINT SIGN PDF
 // ========================================================================
 app.post('/api/sign-pdf', upload.single('files'), async (req, res) => {
-  console.log('Menerima permintaan untuk tanda tangan PDF...');
-
-  if (!req.file || !req.body.signature) {
-    if (req.file) safeUnlink(req.file.path);
-    return res.status(400).send('File dan teks tanda tangan diperlukan.');
-  }
-
-  const cleanup = () => { if (req.file) safeUnlink(req.file.path); };
-  res.on('finish', cleanup);
-  res.on('close', cleanup);
-
   try {
+    const { posX, posY, previewWidth, previewHeight, signature } = req.body;
     const fileBuffer = await fsPromises.readFile(req.file.path);
     const pdfDoc = await PDFDocument.load(fileBuffer);
-    const pages = pdfDoc.getPages();
-    const firstPage = pages[0];
+    const firstPage = pdfDoc.getPages()[0];
     const { width, height } = firstPage.getSize();
-    const font = await pdfDoc.embedFont(StandardFonts.TimesRomanItalic);
+    const ratioX = width / parseFloat(previewWidth);
+    const ratioY = height / parseFloat(previewHeight);
+    const finalX = parseFloat(posX) * ratioX;
+    const finalY = height - (parseFloat(posY) * ratioY);
+    const signatureImageBytes = Buffer.from(signature.split(',')[1], 'base64');
+    const signatureImage = await pdfDoc.embedPng(signatureImageBytes);
+    const sigDims = signatureImage.scale(0.5);
 
-    firstPage.drawText(req.body.signature, {
-      x: width - 200,
-      y: 50,
-      size: 30,
-      font: font,
-      color: rgb(0, 0, 0.5),
+    firstPage.drawImage(signatureImage, {
+      x: finalX - (sigDims.width / 2),
+      y: finalY - (sigDims.height / 2),
+      width: sigDims.width,
+      height: sigDims.height,
     });
 
     const signedPdfBytes = await pdfDoc.save();
-
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'attachment; filename=Hasil-Tanda-Tangan.pdf');
     res.send(Buffer.from(signedPdfBytes));
-
   } catch (error) {
-    console.error('Error saat tanda tangan PDF:', error);
-    if (!res.headersSent) {
-      res.status(500).send('Gagal membubuhkan tanda tangan.');
-    }
+    console.error(error);
+    res.status(500).send('Gagal.');
   }
 });
 

@@ -172,13 +172,6 @@ export const tools: Tool[] = [
 
   // ===================== KEAMANAN =====================
   {
-    slug: 'unlock-pdf',
-    title: 'Buka Kunci PDF',
-    description: 'Hapus proteksi password dari file PDF yang terkunci.',
-    icon: LockOpen,
-    category: 'security',
-  },
-  {
     slug: 'sign-pdf',
     title: 'Tanda Tangan PDF',
     description: 'Tambahkan tanda tangan digital ke dokumen PDF Anda.',
