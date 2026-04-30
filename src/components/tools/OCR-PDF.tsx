@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import Dropzone from '@/components/Dropzone';
-import { FileText, X, Loader2, FileType, Sparkles } from 'lucide-react';
+import { FileText, X, Loader2, Sparkles } from 'lucide-react';
 import { usePdfTool } from '@/hooks/usePdfTool';
 
 export default function OcrPdfTool() {

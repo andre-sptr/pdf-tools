@@ -5,7 +5,6 @@ import { Progress } from '@/components/ui/progress';
 import Dropzone from '@/components/Dropzone';
 import { FileText, X, Loader2, Table } from 'lucide-react';
 import { usePdfTool } from '@/hooks/usePdfTool';
-import { postFile, downloadBlob } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
 
 export default function PdfToExcelTool() {
