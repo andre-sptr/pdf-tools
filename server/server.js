@@ -23,12 +23,16 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 require('dotenv').config();
 const normalizePath = (p) => p.replace(/\\/g, '/');
 const safeUnlink = async (p) => {
+  if (!p) return;
+  const targetPath = normalizePath(p);
   try {
-    if (fs.existsSync(p)) {
-      await fsPromises.unlink(p);
+    if (fs.existsSync(targetPath)) {
+      await fsPromises.unlink(targetPath);
     }
   } catch (err) {
-    console.error(`Gagal menghapus file sementara: ${p}`, err);
+    if (err.code !== 'ENOENT') {
+      console.error(`Gagal menghapus file sementara: ${targetPath}`, err);
+    }
   }
 };
 
