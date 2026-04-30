@@ -738,6 +738,166 @@ app.post('/api/rotate-pdf', upload.single('files'), async (req, res) => {
   }
 });
 
+app.post('/api/lock-pdf', upload.single('files'), async (req, res) => {
+  console.log('Menerima permintaan untuk mengunci PDF...');
+  if (!req.file) return res.status(400).send('Harap unggah 1 file PDF.');
+
+  const password = req.body.password;
+  if (!password || password.trim() === '') {
+    safeUnlink(req.file.path);
+    return res.status(400).send('Password tidak boleh kosong.');
+  }
+
+  const tempId = crypto.randomBytes(16).toString('hex');
+  const inputPath = req.file.path;
+  const outputPath = path.join(os.tmpdir(), `locked-${tempId}.pdf`);
+
+  const cleanup = () => {
+    safeUnlink(inputPath);
+    safeUnlink(outputPath);
+  };
+
+  res.on('finish', cleanup);
+  res.on('close', cleanup);
+
+  try {
+    const randomSuffix = crypto.randomBytes(4).toString('hex');
+    const ownerPassword = password + '_' + randomSuffix;
+
+    const args = [
+      normalizePath(inputPath),
+      'output',
+      normalizePath(outputPath),
+      'user_pw', password,
+      'owner_pw', ownerPassword,
+      'allow', 'printing'
+    ];
+
+    const pdftkProcess = spawn('pdftk', args);
+    let errorOutput = '';
+
+    pdftkProcess.stderr.on('data', (data) => {
+      errorOutput += data.toString();
+    });
+
+    pdftkProcess.on('close', (code) => {
+      if (code !== 0) {
+        console.error('PDFtk Error:', errorOutput);
+        if (!res.headersSent) {
+          return res.status(500).send('Gagal mengunci PDF. Pastikan file tidak rusak.');
+        }
+        return;
+      }
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'attachment; filename=Hasil-Terkunci-PDFTools.pdf');
+
+      const readStream = fs.createReadStream(outputPath);
+      readStream.pipe(res);
+      readStream.on('end', () => console.log('PDF berhasil dikunci.'));
+      readStream.on('error', (err) => {
+        console.error('Stream Error:', err);
+        if (!res.headersSent) res.status(500).send('Gagal mengirim file.');
+      });
+    });
+
+    pdftkProcess.on('error', (err) => {
+      console.error('Gagal memanggil pdftk:', err);
+      if (!res.headersSent) {
+        res.status(500).send('Aplikasi PDFtk belum terinstal atau tidak ada di PATH.');
+      }
+    });
+
+  } catch (error) {
+    console.error('Error saat mengunci PDF:', error);
+    if (!res.headersSent) {
+      res.status(500).send('Terjadi kesalahan internal server.');
+    }
+  }
+});
+
+app.post('/api/unlock-pdf', upload.single('files'), async (req, res) => {
+  console.log('Menerima permintaan untuk membuka kunci PDF...');
+
+  if (!req.file) {
+    return res.status(400).send('Harap unggah 1 file PDF.');
+  }
+
+  const password = req.body.password;
+  if (!password || password.trim() === '') {
+    safeUnlink(req.file.path);
+    return res.status(400).send('Password tidak boleh kosong.');
+  }
+
+  const tempId = crypto.randomBytes(16).toString('hex');
+  const inputPath = req.file.path;
+  const outputPath = path.join(os.tmpdir(), `unlocked-${tempId}.pdf`);
+  const gsCommand = process.platform === 'win32' ? 'gswin64c' : 'gs';
+
+  let responseSent = false;
+
+  const cleanup = () => {
+    safeUnlink(inputPath);
+    safeUnlink(outputPath);
+  };
+
+  res.on('finish', cleanup);
+  res.on('close', cleanup);
+
+  try {
+    const args = [
+      `-sPDFPassword=${password}`,
+      '-sDEVICE=pdfwrite',
+      '-dNOPAUSE',
+      '-dBATCH',
+      '-dQUIET',
+      `-sOutputFile=${normalizePath(outputPath)}`,
+      normalizePath(inputPath)
+    ];
+
+    const gsProcess = spawn(gsCommand, args);
+    let errorOutput = '';
+
+    gsProcess.stderr.on('data', (data) => {
+      errorOutput += data.toString();
+    });
+
+    gsProcess.on('close', (code) => {
+      if (responseSent) return;
+      responseSent = true;
+
+      if (code !== 0) {
+        console.error('Ghostscript Error:', errorOutput);
+        return res.status(400).send('Password salah, file rusak, atau file tidak terenkripsi.');
+      }
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'attachment; filename=Hasil-Terbuka-PDFTools.pdf');
+
+      const readStream = fs.createReadStream(outputPath);
+      readStream.pipe(res);
+      readStream.on('end', () => console.log('PDF berhasil dibuka kuncinya dengan Ghostscript.'));
+      readStream.on('error', (err) => {
+        console.error('Stream Error:', err);
+        if (!res.headersSent) res.status(500).send('Gagal mengirim file ke browser.');
+      });
+    });
+
+    gsProcess.on('error', (err) => {
+      if (responseSent) return;
+      responseSent = true;
+      console.error('Gagal menjalankan Ghostscript:', err);
+      res.status(500).send('Perintah Ghostscript tidak ditemukan di server.');
+    });
+
+  } catch (error) {
+    console.error('Error saat memproses unlock PDF:', error);
+    if (!responseSent) {
+      res.status(500).send('Terjadi kesalahan internal server.');
+    }
+  }
+});
+
 app.post('/api/sign-pdf', upload.single('files'), async (req, res) => {
   try {
     const { posX, posY, previewWidth, previewHeight, signature } = req.body;

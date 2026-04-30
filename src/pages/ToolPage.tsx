@@ -19,6 +19,8 @@ import ConvertToPdfaTool from '@/components/tools/ConvertTo-PDFA';
 import PdfToWordTool from '@/components/tools/PDF-to-Word';
 import PdfToExcelTool from '@/components/tools/PDF-to-Excel';
 import PdfToPptTool from '@/components/tools/PDF-to-PowerPoint';
+import LockPdfTool from '@/components/tools/Lock-PDF';
+import UnlockPdfTool from '@/components/tools/Unlock-PDF';
 import SignPdfTool from '@/components/tools/Sign-PDF';
 import OcrPdfTool from '@/components/tools/OCR-PDF';
 import AiSummarizerTool from '@/components/tools/AI-Summarizer';
@@ -48,6 +50,8 @@ const toolComponents: Record<string, JSX.Element> = {
   'pdf-to-word': <PdfToWordTool />,
   'pdf-to-excel': <PdfToExcelTool />,
   'pdf-to-ppt': <PdfToPptTool />,
+  'lock-pdf': <LockPdfTool />,
+  'unlock-pdf': <UnlockPdfTool />,
   'sign-pdf': <SignPdfTool />,
   'ocr-pdf': <OcrPdfTool />,
   'ai-summarizer': <AiSummarizerTool />,

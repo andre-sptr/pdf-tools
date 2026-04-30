@@ -19,6 +19,7 @@ import {
   ScanSearch,
   Brain,
   Languages,
+  Lock
 } from 'lucide-react';
 
 export type ToolCategory = 'edit' | 'convert-to' | 'convert-from' | 'security' | 'ai';
@@ -171,6 +172,20 @@ export const tools: Tool[] = [
   },
 
   // ===================== KEAMANAN =====================
+  {
+    slug: 'lock-pdf',
+    title: 'Kunci PDF',
+    description: 'Lindungi PDF dengan password untuk mencegah akses tidak sah.',
+    icon: Lock,
+    category: 'security',
+  },
+  {
+    slug: 'unlock-pdf',
+    title: 'Buka Kunci PDF',
+    description: 'Hapus password dari PDF yang terkunci.',
+    icon: LockOpen,
+    category: 'security',
+  },
   {
     slug: 'sign-pdf',
     title: 'Tanda Tangan PDF',
