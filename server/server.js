@@ -877,7 +877,7 @@ app.post('/api/ocr-pdf', upload.single('files'), async (req, res) => {
       return res.status(400).send('File terlalu besar untuk diproses AI. Maksimal 20MB.');
     }
 
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-3.1-pro-preview" });
 
     const prompt = "Tolong lakukan OCR pada dokumen PDF ini. Ekstrak semua teks secara akurat, pertahankan urutan dan formatnya sebaik mungkin. Berikan hasilnya hanya berupa teks yang diekstrak.";
 
@@ -1089,7 +1089,7 @@ app.post('/api/ai-summarize', upload.single('files'), async (req, res) => {
     const data = await parsePdfText(fileBuffer);
     let text = data.text;
 
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-3.1-pro-preview" });
     let result;
 
     if (!text || text.trim().length < 50) {
@@ -1224,7 +1224,7 @@ app.post('/api/ai-translate', upload.single('files'), async (req, res) => {
     const data = await parsePdfText(fileBuffer);
     let text = data.text;
 
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-3.1-pro-preview" });
     let result;
 
     if (!text || text.trim().length < 20) {
