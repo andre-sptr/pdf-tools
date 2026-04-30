@@ -720,63 +720,6 @@ app.post('/api/rotate-pdf', upload.single('files'), async (req, res) => {
   }
 });
 
-app.post('/api/edit-pdf', upload.single('files'), async (req, res) => {
-  if (!req.file) return res.status(400).send('Harap unggah file PDF yang akan diedit.');
-
-  const cleanup = () => { if (req.file) safeUnlink(req.file.path); };
-  res.on('finish', cleanup);
-  res.on('close', cleanup);
-
-  try {
-    const fileBuffer = await fsPromises.readFile(req.file.path);
-    const pdfDoc = await PDFDocument.load(fileBuffer);
-    let elements = [];
-    try {
-      elements = JSON.parse(req.body.elements || '[]');
-    } catch (e) {
-      console.error('JSON Parse Error di /api/edit-pdf:', e);
-      return res.status(400).send('Format elemen tidak valid.');
-    }
-    const pages = pdfDoc.getPages();
-    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-    elements.forEach(el => {
-      const pageIndex = parseInt(el.pageIndex, 10) || 0;
-      const x = parseFloat(el.x) || 50;
-      const y = parseFloat(el.y) || 50;
-      const size = parseFloat(el.size) || 12;
-      const text = String(el.text || '');
-
-      if (pageIndex < pages.length && pageIndex >= 0 && text) {
-        const page = pages[pageIndex];
-        const { width, height } = page.getSize();
-
-        // Bounds check - clamp coordinates to page dimensions
-        const safeX = Math.max(0, Math.min(x, width - 50));
-        const safeY = Math.max(0, Math.min(y, height - 20));
-
-        page.drawText(text, {
-          x: safeX,
-          y: page.getHeight() - safeY,
-          size: size,
-          font: font,
-          color: rgb(0, 0, 0),
-        });
-      }
-    });
-    const editedPdfBytes = await pdfDoc.save();
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'attachment; filename=Hasil-Edit.pdf');
-    res.send(Buffer.from(editedPdfBytes));
-  } catch (error) {
-    console.error('Error editing PDF:', error);
-    if (!res.headersSent) {
-      res.status(500).send('Gagal mengedit PDF.');
-    }
-  }
-});
-
-
-
 // ========================================================================
 // ENDPOINT UNLOCK PDF
 // ========================================================================

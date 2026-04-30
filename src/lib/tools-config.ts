@@ -101,13 +101,6 @@ export const tools: Tool[] = [
     category: 'edit',
   },
   {
-    slug: 'edit-pdf',
-    title: 'Edit PDF',
-    description: 'Tambahkan teks, anotasi, dan elemen lainnya ke dokumen PDF.',
-    icon: Pencil,
-    category: 'edit',
-  },
-  {
     slug: 'organize-pdf',
     title: 'Atur Halaman PDF',
     description: 'Susun ulang, hapus, atau atur urutan halaman PDF sesuai kebutuhan.',
