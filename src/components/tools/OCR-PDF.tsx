@@ -6,7 +6,6 @@ import { FileText, X, Loader2, Sparkles } from 'lucide-react';
 import { usePdfTool } from '@/hooks/usePdfTool';
 
 export default function OcrPdfTool() {
-
   const {
     files,
     isProcessing,

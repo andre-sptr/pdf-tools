@@ -7,14 +7,13 @@ import { usePdfTool } from '@/hooks/usePdfTool';
 import { useToast } from '@/components/ui/use-toast';
 
 export default function PdfToPowerPointTool() {
-  const { toast } = useToast();
-
   const {
     files,
     isProcessing,
     uploadProgress,
     addFiles,
     removeFile,
+    processFiles,
   } = usePdfTool({
     endpoint: '/pdf-to-pptx',
     outputFilename: 'Hasil-PDF-ke-PowerPoint.pptx',

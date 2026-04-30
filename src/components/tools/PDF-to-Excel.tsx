@@ -8,14 +8,13 @@ import { usePdfTool } from '@/hooks/usePdfTool';
 import { useToast } from '@/components/ui/use-toast';
 
 export default function PdfToExcelTool() {
-  const { toast } = useToast();
-
   const {
     files,
     isProcessing,
     uploadProgress,
     addFiles,
     removeFile,
+    processFiles,
   } = usePdfTool({
     endpoint: '/pdf-to-excel',
     outputFilename: 'Hasil-PDF-ke-Excel.xlsx',
