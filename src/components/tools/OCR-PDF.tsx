@@ -1,26 +1,124 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { AxiosProgressEvent } from 'axios';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import Dropzone from '@/components/Dropzone';
 import { FileText, X, Loader2, Sparkles } from 'lucide-react';
-import { usePdfTool } from '@/hooks/usePdfTool';
+import { postFormJson, validatePdfFile, type MarkdownApiResult } from '@/lib/api';
+import { useToast } from '@/components/ui/use-toast';
+import MarkdownResultPanel from './MarkdownResultPanel';
 
 export default function OcrPdfTool() {
-  const {
-    files,
-    isProcessing,
-    uploadProgress,
-    addFiles,
-    removeFile,
-    processFiles,
-  } = usePdfTool({
-    endpoint: '/ocr-pdf',
-    outputFilename: 'Hasil-OCR-PDFTools.txt',
-    maxFiles: 1,
-    minFiles: 1,
-  });
+  const [files, setFiles] = useState<File[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [resultMarkdown, setResultMarkdown] = useState('');
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const { toast } = useToast();
 
-  const processingText = `Memproses OCR... ${uploadProgress}%`;
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
+  const addFiles = useCallback((newFiles: FileList | File[] | null) => {
+    if (!newFiles || newFiles.length === 0) return;
+
+    const fileArray = Array.from(newFiles);
+    const validFiles = fileArray.filter(validatePdfFile);
+    const invalidCount = fileArray.length - validFiles.length;
+
+    if (invalidCount > 0) {
+      toast({
+        title: 'File tidak valid',
+        description: `${invalidCount} file bukan PDF dan telah diabaikan.`,
+        variant: 'destructive',
+      });
+    }
+
+    if (validFiles.length === 0) {
+      toast({
+        title: 'File tidak valid',
+        description: 'Tidak ada file PDF yang dipilih.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setResultMarkdown('');
+    setFiles(validFiles.slice(0, 1));
+  }, [toast]);
+
+  const removeFile = useCallback(() => {
+    setFiles([]);
+  }, []);
+
+  const processFiles = useCallback(async () => {
+    if (files.length === 0) {
+      toast({
+        title: 'Validasi gagal',
+        description: 'Silakan pilih 1 file PDF.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsProcessing(true);
+    setUploadProgress(0);
+    setResultMarkdown('');
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+
+    const formData = new FormData();
+    formData.append('files', files[0]);
+
+    const handleProgress = (event: AxiosProgressEvent) => {
+      if (event.total) {
+        setUploadProgress(Math.round((event.loaded / event.total) * 100));
+      } else {
+        setUploadProgress(-1);
+      }
+    };
+
+    const result = await postFormJson<MarkdownApiResult>('/ocr-pdf', formData, {
+      onProgress: handleProgress,
+      signal: abortControllerRef.current.signal,
+    });
+
+    if (result.error) {
+      toast({
+        title: 'Terjadi kesalahan',
+        description: result.error.message,
+        variant: 'destructive',
+      });
+    } else if (result.data?.markdown) {
+      setResultMarkdown(result.data.markdown);
+      toast({
+        title: 'Berhasil!',
+        description: 'Hasil OCR telah dibuat dan ditampilkan.',
+      });
+      setFiles([]);
+    }
+
+    setIsProcessing(false);
+    setUploadProgress(0);
+    abortControllerRef.current = null;
+  }, [files, toast]);
+
+  const resetResult = useCallback(() => {
+    setResultMarkdown('');
+    setFiles([]);
+  }, []);
+
+  const progressLabel = uploadProgress >= 0 ? `${uploadProgress}%` : 'mengunggah...';
+  const processingText = `Memproses OCR... ${progressLabel}`;
 
   return (
     <Card className="w-full shadow-none border-none">
@@ -49,7 +147,7 @@ export default function OcrPdfTool() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => removeFile(0)}
+                onClick={removeFile}
                 className="p-1 h-auto"
                 disabled={isProcessing}
               >
@@ -61,7 +159,7 @@ export default function OcrPdfTool() {
 
         {isProcessing && (
           <div className="mt-4 px-4">
-            <Progress value={uploadProgress} className="h-2" />
+            <Progress value={Math.max(uploadProgress, 0)} className="h-2" />
             <p className="text-sm text-gray-500 mt-2 text-center">{processingText}</p>
           </div>
         )}
@@ -85,6 +183,14 @@ export default function OcrPdfTool() {
             )}
           </Button>
         </div>
+
+        {resultMarkdown && (
+          <MarkdownResultPanel
+            title="Hasil OCR"
+            markdown={resultMarkdown}
+            onReset={resetResult}
+          />
+        )}
       </CardContent>
     </Card>
   );

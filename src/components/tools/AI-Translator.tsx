@@ -6,8 +6,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import type { AxiosProgressEvent } from 'axios';
 import Dropzone from '@/components/Dropzone';
 import { FileText, X, Loader2, Languages } from 'lucide-react';
-import { postFile, downloadBlob, validatePdfFile } from '@/lib/api';
+import { postFormJson, validatePdfFile, type MarkdownApiResult } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
+import MarkdownResultPanel from './MarkdownResultPanel';
 
 const LANGUAGES = [
   { value: 'en', label: 'English' },
@@ -28,6 +29,7 @@ export default function AiTranslatorTool() {
   const [files, setFiles] = useState<File[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [resultMarkdown, setResultMarkdown] = useState('');
   const abortControllerRef = useRef<AbortController | null>(null);
   const { toast } = useToast();
 
@@ -62,6 +64,7 @@ export default function AiTranslatorTool() {
       return;
     }
 
+    setResultMarkdown('');
     setFiles(validFiles.slice(0, 1));
   }, [toast]);
 
@@ -81,6 +84,7 @@ export default function AiTranslatorTool() {
 
     setIsProcessing(true);
     setUploadProgress(0);
+    setResultMarkdown('');
 
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -99,7 +103,7 @@ export default function AiTranslatorTool() {
       }
     };
 
-    const result = await postFile('/ai-translate', formData, {
+    const result = await postFormJson<MarkdownApiResult>('/ai-translate', formData, {
       onProgress: handleProgress,
       signal: abortControllerRef.current.signal,
     });
@@ -110,11 +114,11 @@ export default function AiTranslatorTool() {
         description: result.error.message,
         variant: 'destructive',
       });
-    } else if (result.data) {
-      downloadBlob(result.data as Blob, 'Hasil-Terjemahan-AI.txt');
+    } else if (result.data?.markdown) {
+      setResultMarkdown(result.data.markdown);
       toast({
         title: 'Berhasil!',
-        description: 'File telah diterjemahkan.',
+        description: 'Terjemahan telah dibuat dan ditampilkan.',
       });
       setFiles([]);
     }
@@ -124,7 +128,13 @@ export default function AiTranslatorTool() {
     abortControllerRef.current = null;
   }, [files, targetLanguage, toast]);
 
-  const processingText = `Menerjemahkan... ${uploadProgress}%`;
+  const resetResult = useCallback(() => {
+    setResultMarkdown('');
+    setFiles([]);
+  }, []);
+
+  const progressLabel = uploadProgress >= 0 ? `${uploadProgress}%` : 'mengunggah...';
+  const processingText = `Menerjemahkan... ${progressLabel}`;
 
   return (
     <Card className="w-full shadow-none border-none">
@@ -183,7 +193,7 @@ export default function AiTranslatorTool() {
 
         {isProcessing && (
           <div className="mt-4 px-4">
-            <Progress value={uploadProgress} className="h-2" />
+            <Progress value={Math.max(uploadProgress, 0)} className="h-2" />
             <p className="text-sm text-gray-500 mt-2 text-center">{processingText}</p>
           </div>
         )}
@@ -207,6 +217,14 @@ export default function AiTranslatorTool() {
             )}
           </Button>
         </div>
+
+        {resultMarkdown && (
+          <MarkdownResultPanel
+            title="Hasil Terjemahan AI"
+            markdown={resultMarkdown}
+            onReset={resetResult}
+          />
+        )}
       </CardContent>
     </Card>
   );

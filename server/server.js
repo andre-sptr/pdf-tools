@@ -933,7 +933,7 @@ app.post('/api/ocr-pdf', upload.single('files'), async (req, res) => {
   console.log('Menerima permintaan untuk OCR PDF dengan Gemini 3.1 Pro...');
 
   if (!req.file) {
-    return res.status(400).send('Harap unggah file PDF.');
+    return res.status(400).json({ message: 'Harap unggah file PDF.' });
   }
 
   const cleanup = () => { if (req.file) safeUnlink(req.file.path); };
@@ -944,12 +944,17 @@ app.post('/api/ocr-pdf', upload.single('files'), async (req, res) => {
     const fileBuffer = await fsPromises.readFile(req.file.path);
 
     if (fileBuffer.length > 20 * 1024 * 1024) {
-      return res.status(400).send('File terlalu besar untuk diproses AI. Maksimal 20MB.');
+      return res.status(400).json({ message: 'File terlalu besar untuk diproses AI. Maksimal 20MB.' });
     }
 
     const model = genAI.getGenerativeModel({ model: "gemini-3.1-pro-preview" });
 
-    const prompt = "Tolong lakukan OCR pada dokumen PDF ini. Ekstrak semua teks secara akurat, pertahankan urutan dan formatnya sebaik mungkin. Berikan hasilnya hanya berupa teks yang diekstrak.";
+    const prompt = [
+      "Tolong lakukan OCR pada dokumen PDF ini.",
+      "Ekstrak semua teks secara akurat dan pertahankan urutan bacanya.",
+      "Format hasil sebagai Markdown yang rapi: gunakan heading, paragraf, bullet list, atau tabel Markdown jika struktur dokumen mendukung.",
+      "Berikan hanya hasil OCR dalam Markdown, tanpa penjelasan tambahan."
+    ].join(" ");
 
     const result = await model.generateContent([
       prompt,
@@ -962,18 +967,19 @@ app.post('/api/ocr-pdf', upload.single('files'), async (req, res) => {
     ]);
 
     const response = await result.response;
-    const text = response.text();
+    const markdown = response.text();
 
-    res.setHeader('Content-Type', 'text/plain');
-    res.setHeader('Content-Disposition', 'attachment; filename=Hasil-OCR.txt');
-    res.send(text);
+    res.json({
+      type: 'ocr',
+      markdown
+    });
 
     console.log('OCR AI berhasil diproses dan dikirim.');
 
   } catch (error) {
     console.error('Error saat OCR AI:', error);
     if (!res.headersSent) {
-      res.status(500).send('Gagal memproses OCR dengan AI. Pastikan file tidak terlalu besar.');
+      res.status(500).json({ message: 'Gagal memproses OCR dengan AI. Pastikan file tidak terlalu besar.' });
     }
   }
 });
@@ -1053,7 +1059,7 @@ app.post('/api/ai-summarize', upload.single('files'), async (req, res) => {
   console.log('Menerima permintaan untuk Ringkasan AI...');
 
   if (!req.file) {
-    return res.status(400).send('Harap unggah 1 file PDF.');
+    return res.status(400).json({ message: 'Harap unggah 1 file PDF.' });
   }
 
   const cleanup = () => { if (req.file) safeUnlink(req.file.path); };
@@ -1061,16 +1067,21 @@ app.post('/api/ai-summarize', upload.single('files'), async (req, res) => {
   res.on('close', cleanup);
 
   const summaryLength = req.body.summaryLength || 'medium';
-  let prompt = "Tolong buatkan ringkasan dari dokumen PDF ini dalam Bahasa Indonesia. ";
+  let prompt = [
+    "Tolong buatkan ringkasan dari dokumen PDF ini dalam Bahasa Indonesia.",
+    "Format jawaban sebagai Markdown yang rapi.",
+    "Gunakan struktur: # Ringkasan, ## Poin Penting, dan ## Detail Ringkasan.",
+    "Gunakan bullet list untuk poin penting."
+  ].join(" ");
 
-  if (summaryLength === 'short') prompt += "Buat ringkasan yang singkat (1-2 paragraf).";
-  else if (summaryLength === 'long') prompt += "Buat ringkasan yang detail dan panjang.";
-  else prompt += "Buat ringkasan dengan panjang sedang (3-4 paragraf).";
+  if (summaryLength === 'short') prompt += " Buat ringkasan yang singkat (1-2 paragraf).";
+  else if (summaryLength === 'long') prompt += " Buat ringkasan yang detail dan panjang.";
+  else prompt += " Buat ringkasan dengan panjang sedang (3-4 paragraf).";
 
   try {
     const fileBuffer = await fsPromises.readFile(req.file.path);
     if (fileBuffer.length > 20 * 1024 * 1024) {
-      return res.status(400).send('File terlalu besar untuk diproses AI. Maksimal 20MB.');
+      return res.status(400).json({ message: 'File terlalu besar untuk diproses AI. Maksimal 20MB.' });
     }
     const data = await parsePdfText(fileBuffer);
     let text = data.text;
@@ -1094,18 +1105,19 @@ app.post('/api/ai-summarize', upload.single('files'), async (req, res) => {
     }
 
     const response = await result.response;
-    const summary = response.text();
+    const markdown = response.text();
 
-    res.setHeader('Content-Type', 'text/plain');
-    res.setHeader('Content-Disposition', 'attachment; filename=Hasil-Ringkasan-AI.txt');
-    res.send(summary);
+    res.json({
+      type: 'summary',
+      markdown
+    });
 
     console.log('Ringkasan AI berhasil dibuat dan dikirim.');
 
   } catch (error) {
     console.error('Error saat membuat ringkasan AI:', error);
     if (!res.headersSent) {
-      res.status(500).send('Terjadi kesalahan di server saat memproses AI.');
+      res.status(500).json({ message: 'Terjadi kesalahan di server saat memproses AI.' });
     }
   }
 });
@@ -1154,7 +1166,7 @@ app.post('/api/ai-translate', upload.single('files'), async (req, res) => {
   console.log('Menerima permintaan untuk Terjemahan AI...');
 
   if (!req.file) {
-    return res.status(400).send('Harap unggah 1 file PDF.');
+    return res.status(400).json({ message: 'Harap unggah 1 file PDF.' });
   }
 
   const cleanup = () => { if (req.file) safeUnlink(req.file.path); };
@@ -1162,12 +1174,17 @@ app.post('/api/ai-translate', upload.single('files'), async (req, res) => {
   res.on('close', cleanup);
 
   const targetLanguage = req.body.targetLanguage || 'en';
-  const prompt = `Tolong terjemahkan isi dokumen PDF ini ke bahasa dengan kode "${targetLanguage}". Pertahankan makna asli dan gaya bahasanya. Berikan hasil terjemahan saja.`;
+  const prompt = [
+    `Tolong terjemahkan isi dokumen PDF ini ke bahasa dengan kode "${targetLanguage}".`,
+    "Pertahankan makna asli, gaya bahasa, dan struktur dokumen sebaik mungkin.",
+    "Format hasil terjemahan sebagai Markdown yang rapi dengan heading, paragraf, bullet list, atau tabel Markdown jika sesuai.",
+    "Berikan hanya hasil terjemahan dalam Markdown, tanpa penjelasan tambahan."
+  ].join(" ");
 
   try {
     const fileBuffer = await fsPromises.readFile(req.file.path);
     if (fileBuffer.length > 20 * 1024 * 1024) {
-      return res.status(400).send('File terlalu besar untuk diproses AI. Maksimal 20MB.');
+      return res.status(400).json({ message: 'File terlalu besar untuk diproses AI. Maksimal 20MB.' });
     }
     const data = await parsePdfText(fileBuffer);
     let text = data.text;
@@ -1191,18 +1208,19 @@ app.post('/api/ai-translate', upload.single('files'), async (req, res) => {
     }
 
     const response = await result.response;
-    const translatedText = response.text();
+    const markdown = response.text();
 
-    res.setHeader('Content-Type', 'text/plain');
-    res.setHeader('Content-Disposition', 'attachment; filename=Hasil-Terjemahan-AI.txt');
-    res.send(translatedText);
+    res.json({
+      type: 'translation',
+      markdown
+    });
 
     console.log('Terjemahan AI berhasil dibuat dan dikirim.');
 
   } catch (error) {
     console.error('Error saat menerjemahkan AI:', error);
     if (!res.headersSent) {
-      res.status(500).send('Terjadi kesalahan di server saat memproses AI.');
+      res.status(500).json({ message: 'Terjadi kesalahan di server saat memproses AI.' });
     }
   }
 });

@@ -17,6 +17,11 @@ export interface ApiResponse<T = unknown> {
   error?: ApiError;
 }
 
+export interface MarkdownApiResult {
+  type: 'summary' | 'translation' | 'ocr' | string;
+  markdown: string;
+}
+
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
   timeout: 120000,
@@ -47,6 +52,53 @@ export async function postFile<T = unknown>(
           errorMessage = errorJson.message || errorMessage;
         } catch {
         }
+      }
+
+      return {
+        error: {
+          message: errorMessage,
+          code: error.code,
+        },
+      };
+    }
+
+    return {
+      error: {
+        message: 'Tidak dapat terhubung ke server.',
+      },
+    };
+  }
+}
+
+export async function postFormJson<T = unknown>(
+  endpoint: string,
+  data: FormData,
+  options?: UploadOptions
+): Promise<ApiResponse<T>> {
+  try {
+    const response = await apiClient.post<T>(endpoint, data, {
+      onUploadProgress: options?.onProgress,
+      signal: options?.signal,
+    });
+
+    return { data: response.data };
+  } catch (error) {
+    if (error instanceof AxiosError) {
+      let errorMessage = 'Terjadi kesalahan pada server.';
+      const responseData = error.response?.data;
+
+      if (responseData instanceof Blob) {
+        try {
+          const errorText = await responseData.text();
+          const errorJson = JSON.parse(errorText);
+          errorMessage = errorJson.message || errorText || errorMessage;
+        } catch {
+          errorMessage = 'Terjadi kesalahan pada server.';
+        }
+      } else if (typeof responseData === 'string') {
+        errorMessage = responseData || errorMessage;
+      } else if (responseData && typeof responseData === 'object' && 'message' in responseData) {
+        errorMessage = String((responseData as { message?: unknown }).message || errorMessage);
       }
 
       return {
