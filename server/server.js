@@ -288,16 +288,16 @@ app.post('/api/convert-to-pdf', upload.array('files'), (req, res) => {
   console.log('Menerima permintaan untuk konversi Gambar ke PDF...');
 
   if (!req.files || req.files.length === 0) {
-    return res.status(400).send('Harap unggah minimal 1 file gambar (JPG/PNG).');
+    return res.status(400).send('Harap unggah minimal 1 file gambar (JPG/JPEG/PNG).');
   }
 
   const imageFiles = req.files.filter(file =>
-    file.mimetype === 'image/jpeg' || file.mimetype === 'image/png'
+    file.mimetype === 'image/jpg' || file.mimetype === 'image/jpeg' || file.mimetype === 'image/png'
   );
 
   if (imageFiles.length === 0) {
     req.files.forEach(file => safeUnlink(file.path));
-    return res.status(400).send('Tidak ada file JPG atau PNG yang valid ditemukan.');
+    return res.status(400).send('Tidak ada file JPG/JPEG/PNG yang valid ditemukan.');
   }
 
   const cleanup = () => {
@@ -318,9 +318,8 @@ app.post('/api/convert-to-pdf', upload.array('files'), (req, res) => {
     doc.pipe(res);
 
     for (const file of imageFiles) {
-      doc.addPage();
-
-      doc.image(file.path, {
+      doc.addPage({ margin: 0 });
+      doc.image(file.path, 0, 0, {
         fit: [doc.page.width, doc.page.height],
         align: 'center',
         valign: 'center'
@@ -843,83 +842,6 @@ app.post('/api/ocr-pdf', upload.single('files'), async (req, res) => {
     if (!res.headersSent) {
       res.status(500).send('Gagal memproses OCR dengan AI. Pastikan file tidak terlalu besar.');
     }
-  }
-});
-
-// ========================================================================
-// ENDPOINT SCAN TO PDF
-// ========================================================================
-app.post('/api/scan-to-pdf', upload.array('files'), (req, res) => {
-  console.log('Menerima permintaan untuk Scan Gambar ke PDF...');
-
-  if (!req.files || req.files.length === 0) {
-    return res.status(400).send('Harap unggah minimal 1 file gambar hasil scan.');
-  }
-
-  const cleanup = () => {
-    req.files.forEach(file => safeUnlink(file.path));
-  };
-  res.on('finish', cleanup);
-  res.on('close', cleanup);
-
-  try {
-    const doc = new PDFKitDocument({ autoFirstPage: false });
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'attachment; filename=Hasil-Scan.pdf');
-    doc.pipe(res);
-
-    for (const file of req.files) {
-      doc.addPage();
-      doc.image(file.path, {
-        fit: [doc.page.width, doc.page.height],
-        align: 'center',
-        valign: 'center'
-      });
-    }
-    doc.end();
-    console.log('Scan berhasil dikonversi ke PDF.');
-  } catch (error) {
-    console.error('Error saat scan to PDF:', error);
-    if (!res.headersSent) {
-      res.status(500).send('Gagal memproses scan ke PDF.');
-    } else {
-      res.end();
-    }
-  }
-});
-
-// ========================================================================
-// ENDPOINT HTML TO PDF
-// ========================================================================
-app.post('/api/html-to-pdf', upload.array('files'), async (req, res) => {
-  console.log('Menerima permintaan untuk HTML ke PDF...');
-
-  if (!req.files || req.files.length === 0) {
-    return res.status(400).send('Harap unggah minimal 1 file HTML.');
-  }
-
-  const cleanup = () => {
-    req.files.forEach(file => safeUnlink(file.path));
-  };
-  res.on('finish', cleanup);
-  res.on('close', cleanup);
-
-  try {
-    const fileBuffer = await fsPromises.readFile(req.files[0].path);
-    libre.convert(fileBuffer, '.pdf', undefined, (err, done) => {
-      if (err) {
-        console.error('LibreOffice Error (HTML to PDF):', err);
-        if (!res.headersSent) return res.status(500).send('Gagal mengonversi HTML ke PDF.');
-      }
-      if (!res.headersSent) {
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', 'attachment; filename=Hasil-HTML.pdf');
-        res.send(done);
-      }
-    });
-  } catch (error) {
-    console.error('Error processing HTML to PDF:', error);
-    if (!res.headersSent) res.status(500).send('Terjadi kesalahan saat memproses file.');
   }
 });
 
