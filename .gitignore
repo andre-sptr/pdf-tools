@@ -33,3 +33,11 @@ lerna-debug.log*
 *.njsproj
 *.sln
 *.sw?
+
+template_config.json
+
+.agents/
+
+.claude/
+
+*.tsbuildinfo

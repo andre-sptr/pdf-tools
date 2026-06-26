@@ -1,13 +1,13 @@
 # pdf-tools
 
-Full-stack PDF utility app for common document workflows such as merge, split, compress, rotate, and conversion.
+Full-stack PDF utility app for common document workflows such as merge, split, compress, rotate, conversion, security, OCR, and AI-assisted PDF actions.
 
 ## Features
 
-- PDF merge and split workflows.
-- Compression and rotation utilities.
-- Conversion-related backend endpoints.
-- React UI with reusable component patterns.
+- PDF merge, split, compression, and rotation.
+- PDF conversion workflows.
+- PDF lock, unlock, sign, OCR, and AI summarization/translation features.
+- React UI with a Node.js/Express backend.
 
 ## Tech Stack
 
@@ -15,7 +15,8 @@ Full-stack PDF utility app for common document workflows such as merge, split, c
 - Vite
 - TypeScript
 - Tailwind CSS
-- Node.js backend
+- Node.js
+- Express
 - PDF processing libraries
 
 ## Getting Started
@@ -31,6 +32,10 @@ Build for production:
 npm run build
 ```
 
+## Environment Variables
+
+Copy `.env.example` to `.env` for frontend settings and `server/.env.example` to `server/.env` for backend settings. Do not commit real `.env` files.
+
 ## Status
 
-Maintained utility app. The current default branch is `fix/tools-bugfixes`; branch cleanup should be handled separately after reconciling it with `main`.
+Maintained utility app. The default branch is `main`.
