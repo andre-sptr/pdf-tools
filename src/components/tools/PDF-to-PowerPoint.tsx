@@ -1,22 +1,19 @@
-import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import Dropzone from '@/components/Dropzone';
 import { FileText, X, Loader2, Presentation } from 'lucide-react';
 import { usePdfTool } from '@/hooks/usePdfTool';
-import { postFile, downloadBlob } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
 
 export default function PdfToPowerPointTool() {
-  const { toast } = useToast();
-
   const {
     files,
     isProcessing,
     uploadProgress,
     addFiles,
     removeFile,
+    processFiles,
   } = usePdfTool({
     endpoint: '/pdf-to-pptx',
     outputFilename: 'Hasil-PDF-ke-PowerPoint.pptx',

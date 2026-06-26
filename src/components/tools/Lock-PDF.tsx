@@ -5,11 +5,11 @@ import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
 import type { AxiosProgressEvent } from 'axios';
 import Dropzone from '@/components/Dropzone';
-import { FileText, X, Loader2, LockOpen, Eye, EyeOff } from 'lucide-react';
+import { FileText, X, Loader2, Lock, Eye, EyeOff } from 'lucide-react';
 import { postFile, downloadBlob, validatePdfFile } from '@/lib/api';
 import { useToast } from '@/components/ui/use-toast';
 
-export default function UnlockPdfTool() {
+export default function LockPdfTool() {
     const [files, setFiles] = useState<File[]>([]);
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -69,7 +69,7 @@ export default function UnlockPdfTool() {
         if (!password || password.trim() === '') {
             toast({
                 title: 'Password kosong',
-                description: 'Silakan masukkan password untuk membuka PDF.',
+                description: 'Silakan masukkan password untuk mengunci PDF.',
                 variant: 'destructive',
             });
             return;
@@ -95,7 +95,7 @@ export default function UnlockPdfTool() {
             }
         };
 
-        const result = await postFile('/unlock-pdf', formData, {
+        const result = await postFile('/lock-pdf', formData, {
             onProgress: handleProgress,
             signal: abortControllerRef.current.signal,
         });
@@ -107,10 +107,10 @@ export default function UnlockPdfTool() {
                 variant: 'destructive',
             });
         } else if (result.data) {
-            downloadBlob(result.data as Blob, 'Hasil-Terbuka-PDFTools.pdf');
+            downloadBlob(result.data as Blob, 'Hasil-Terkunci-PDFTools.pdf');
             toast({
                 title: 'Berhasil!',
-                description: 'Password PDF telah dihapus.',
+                description: 'PDF telah dikunci dengan password.',
             });
             setFiles([]);
             setPassword('');
@@ -121,7 +121,7 @@ export default function UnlockPdfTool() {
         abortControllerRef.current = null;
     }, [files, password, toast]);
 
-    const processingText = `Membuka kunci... ${uploadProgress}%`;
+    const processingText = `Mengunci... ${uploadProgress}%`;
 
     return (
         <Card className="w-full shadow-none border-none">
@@ -134,14 +134,14 @@ export default function UnlockPdfTool() {
                         accept=".pdf"
                         multiple={false}
                         maxFiles={1}
-                        dropzoneText="Seret & Lepaskan PDF terkunci di sini"
-                        hint="untuk menghapus password"
+                        dropzoneText="Seret & Lepaskan PDF di sini"
+                        hint="untuk dikunci dengan password"
                     />
                 )}
 
                 {files.length > 0 && (
                     <div className="mt-6 px-4">
-                        <h3 className="font-semibold text-blue-900 mb-3">File yang akan dibuka:</h3>
+                        <h3 className="font-semibold text-blue-900 mb-3">File yang akan dikunci:</h3>
                         <div className="flex items-center p-3 bg-white border border-blue-100 rounded-lg shadow-sm">
                             <FileText className="w-6 h-6 text-blue-600 mr-4" />
                             <span className="flex-grow text-sm font-medium text-gray-800 truncate">
@@ -162,11 +162,11 @@ export default function UnlockPdfTool() {
 
                 {files.length > 0 && (
                     <div className="mt-6 px-4 space-y-3">
-                        <h3 className="font-semibold text-blue-900">Masukkan Password PDF</h3>
+                        <h3 className="font-semibold text-blue-900">Masukkan Password</h3>
                         <div className="relative">
                             <Input
                                 type={showPassword ? 'text' : 'password'}
-                                placeholder="Masukkan password PDF"
+                                placeholder="Masukkan password untuk mengunci PDF"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 disabled={isProcessing}
@@ -187,7 +187,7 @@ export default function UnlockPdfTool() {
                             </Button>
                         </div>
                         <p className="text-xs text-gray-500">
-                            Masukkan password untuk membuka kunci PDF ini.
+                            Password akan digunakan untuk membuka PDF ini nantinya.
                         </p>
                     </div>
                 )}
@@ -212,8 +212,8 @@ export default function UnlockPdfTool() {
                             </>
                         ) : (
                             <>
-                                <LockOpen className="mr-2 h-5 w-5" />
-                                Buka Kunci PDF Sekarang
+                                <Lock className="mr-2 h-5 w-5" />
+                                Kunci PDF Sekarang
                             </>
                         )}
                     </Button>

@@ -1,27 +1,11 @@
-import { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import Dropzone from '@/components/Dropzone';
 import { FileText, X, Loader2 } from 'lucide-react';
 import { usePdfTool } from '@/hooks/usePdfTool';
-import { postFile, downloadBlob } from '@/lib/api';
-import { useToast } from '@/components/ui/use-toast';
-
-const ACCEPTED_TYPES = [
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'application/vnd.ms-excel'
-];
-
-function validateExcelFile(file: File): boolean {
-  return ACCEPTED_TYPES.includes(file.type) ||
-    file.name.endsWith('.xlsx') ||
-    file.name.endsWith('.xls');
-}
 
 export default function ExcelToPdfTool() {
-  const { toast } = useToast();
-
   const {
     files,
     isProcessing,

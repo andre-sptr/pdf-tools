@@ -11,18 +11,15 @@ import CompressPdfTool from '@/components/tools/Compress-PDF';
 import ConvertToPdfTool from '@/components/tools/ConvertTo-PDF';
 import ConvertFromPdfTool from '@/components/tools/ConvertFrom-PDF';
 import RotatePdfTool from '@/components/tools/Rotate-PDF';
-import EditPdfTool from '@/components/tools/Edit-PDF';
 import OrganizePdfTool from '@/components/tools/Organize-PDF';
-import RepairPdfTool from '@/components/tools/Repair-PDF';
 import WordToPdfTool from '@/components/tools/Word-to-PDF';
 import ExcelToPdfTool from '@/components/tools/Excel-to-PDF';
 import PptToPdfTool from '@/components/tools/PowerPoint-to-PDF';
-import HtmlToPdfTool from '@/components/tools/HTML-to-PDF';
-import ScanToPdfTool from '@/components/tools/Scan-to-PDF';
 import ConvertToPdfaTool from '@/components/tools/ConvertTo-PDFA';
 import PdfToWordTool from '@/components/tools/PDF-to-Word';
 import PdfToExcelTool from '@/components/tools/PDF-to-Excel';
 import PdfToPptTool from '@/components/tools/PDF-to-PowerPoint';
+import LockPdfTool from '@/components/tools/Lock-PDF';
 import UnlockPdfTool from '@/components/tools/Unlock-PDF';
 import SignPdfTool from '@/components/tools/Sign-PDF';
 import OcrPdfTool from '@/components/tools/OCR-PDF';
@@ -45,19 +42,15 @@ const toolComponents: Record<string, JSX.Element> = {
   'convert-to-pdf': <ConvertToPdfTool />,
   'convert-from-pdf': <ConvertFromPdfTool />,
   'rotate-pdf': <RotatePdfTool />,
-  'edit-pdf': <EditPdfTool />,
   'organize-pdf': <OrganizePdfTool />,
-  'repair-pdf': <RepairPdfTool />,
   'word-to-pdf': <WordToPdfTool />,
   'excel-to-pdf': <ExcelToPdfTool />,
   'ppt-to-pdf': <PptToPdfTool />,
-  'html-to-pdf': <HtmlToPdfTool />,
-  'scan-to-pdf': <ScanToPdfTool />,
   'convert-to-pdfa': <ConvertToPdfaTool />,
   'pdf-to-word': <PdfToWordTool />,
   'pdf-to-excel': <PdfToExcelTool />,
   'pdf-to-ppt': <PdfToPptTool />,
-
+  'lock-pdf': <LockPdfTool />,
   'unlock-pdf': <UnlockPdfTool />,
   'sign-pdf': <SignPdfTool />,
   'ocr-pdf': <OcrPdfTool />,

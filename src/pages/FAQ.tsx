@@ -14,7 +14,7 @@ const faqs = [
   },
   {
     question: "Format file apa saja yang didukung?",
-    answer: "Kami mendukung file PDF untuk semua tool pengolahan. Untuk konversi, kami mendukung Word (.docx), Excel (.xlsx), PowerPoint (.pptx), dan berbagai format gambar (JPG, PNG)."
+    answer: "Kami mendukung file PDF untuk semua tool pengolahan. Untuk konversi, kami mendukung Word (.docx), Excel (.xlsx), PowerPoint (.pptx), dan berbagai format gambar (JPG, JPEG, PNG)."
   },
   {
     question: "Berapa ukuran maksimal file yang bisa diupload?",
@@ -50,7 +50,7 @@ export default function FAQ() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
       <Header />
-      
+
       {/* Hero Section */}
       <section className="bg-gradient-to-r from-blue-700 to-blue-600 text-white py-16">
         <div className="container mx-auto px-4">
@@ -113,7 +113,7 @@ export default function FAQ() {
               <h2 className="text-3xl font-bold text-blue-900 text-center mb-12">
                 Jawaban Lengkap untuk Pertanyaan Anda
               </h2>
-              
+
               <Card className="shadow-lg border-blue-200">
                 <CardContent className="p-6">
                   <Accordion type="single" collapsible className="w-full">
@@ -139,7 +139,7 @@ export default function FAQ() {
                   Masih Ada Pertanyaan?
                 </h3>
                 <p className="text-blue-100 mb-6 max-w-2xl mx-auto">
-                  Jika Anda tidak menemukan jawaban yang dicari, jangan ragu untuk 
+                  Jika Anda tidak menemukan jawaban yang dicari, jangan ragu untuk
                   menghubungi tim kami. Kami siap membantu Anda.
                 </p>
                 <a
@@ -158,10 +158,10 @@ export default function FAQ() {
       <footer className="bg-blue-900 text-white py-4">
         <div className="container mx-auto px-4 text-center">
           <p className="text-blue-200">
-            <a 
-              href="https://andresptr.site" 
-              target="_blank" 
-              rel="noopener noreferrer" 
+            <a
+              href="https://andresptr.site"
+              target="_blank"
+              rel="noopener noreferrer"
               className="font-semibold text-white hover:underline"
             >
               © {new Date().getFullYear()} Andre Saputra

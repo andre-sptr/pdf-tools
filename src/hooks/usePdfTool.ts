@@ -51,7 +51,7 @@ export function usePdfTool({
     if (!newFiles || newFiles.length === 0) return;
 
     const fileArray = Array.from(newFiles);
-    let validFiles = fileArray.filter(file => {
+    const validFiles = fileArray.filter(file => {
       if (!file.name || file.name.trim() === '') return false;
       if (!allowedTypes) {
         return file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
@@ -177,7 +177,7 @@ export function usePdfTool({
 
     const formData = new FormData();
     files.forEach((file, index) => {
-      formData.append(`files[${index}]`, file);
+      formData.append(`files`, file);
     });
 
     const handleProgress = (event: AxiosProgressEvent) => {

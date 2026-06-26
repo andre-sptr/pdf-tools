@@ -41,7 +41,7 @@ export default function ConvertToPdfTool() {
             accept="image/jpeg,image/png"
             multiple
             maxFiles={50}
-            dropzoneText="Seret & Lepaskan file Gambar (JPG/PNG) di sini"
+            dropzoneText="Seret & Lepaskan file Gambar (JPG/JPEG/PNG) di sini"
           />
         )}
 

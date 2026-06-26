@@ -5,23 +5,33 @@ const PDFKitDocument = require('pdfkit');
 const cors = require('cors');
 const archiver = require('archiver');
 const fs = require('fs');
+const { exec } = require('child_process');
+const xlsx = require('xlsx');
 const fsPromises = fs.promises;
 const path = require('path');
 const os = require('os')
 const { spawn } = require('child_process');
 const crypto = require('crypto');
 const libre = require('libreoffice-convert');
-const pdf = require('pdf-parse');
+const { PDFParse } = require('pdf-parse');
+const parsePdfText = async (buffer) => {
+  const parser = new PDFParse({ data: buffer });
+  return await parser.getText();
+};
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 require('dotenv').config();
 const normalizePath = (p) => p.replace(/\\/g, '/');
 const safeUnlink = async (p) => {
+  if (!p) return;
+  const targetPath = normalizePath(p);
   try {
-    if (fs.existsSync(p)) {
-      await fsPromises.unlink(p);
+    if (fs.existsSync(targetPath)) {
+      await fsPromises.unlink(targetPath);
     }
   } catch (err) {
-    console.error(`Gagal menghapus file sementara: ${p}`, err);
+    if (err.code !== 'ENOENT') {
+      console.error(`Gagal menghapus file sementara: ${targetPath}`, err);
+    }
   }
 };
 
@@ -52,9 +62,6 @@ const upload = multer({
   limits: { fileSize: 50 * 1024 * 1024 }
 });
 
-// ========================================================================
-// ENDPOINT MERGE PDF
-// ========================================================================
 app.post('/api/merge-pdf', upload.array('files'), async (req, res) => {
   console.log('Menerima permintaan untuk menggabungkan PDF...');
 
@@ -96,9 +103,6 @@ app.post('/api/merge-pdf', upload.array('files'), async (req, res) => {
   }
 });
 
-// ========================================================================
-// ENDPOINT SPLIT PDF
-// ========================================================================
 app.post('/api/split-pdf', upload.single('files'), async (req, res) => {
   console.log('Menerima permintaan untuk memisah PDF...');
 
@@ -146,7 +150,6 @@ app.post('/api/split-pdf', upload.single('files'), async (req, res) => {
 
       if (range.includes('-')) {
         const parts = range.split('-');
-        // Validate format: harus ada 2 bagian
         if (parts.length !== 2) {
           console.warn(`Format rentang tidak valid: ${range}`);
           continue;
@@ -195,9 +198,6 @@ app.post('/api/split-pdf', upload.single('files'), async (req, res) => {
   }
 });
 
-// ========================================================================
-// ENDPOINT COMPRESS PDF
-// ========================================================================
 app.post('/api/compress-pdf', upload.single('files'), async (req, res) => {
   console.log('Menerima permintaan untuk kompres PDF...');
 
@@ -275,23 +275,20 @@ app.post('/api/compress-pdf', upload.single('files'), async (req, res) => {
   }
 });
 
-// ========================================================================
-// ENDPOINT CONVERT TO PDF
-// ========================================================================
 app.post('/api/convert-to-pdf', upload.array('files'), (req, res) => {
   console.log('Menerima permintaan untuk konversi Gambar ke PDF...');
 
   if (!req.files || req.files.length === 0) {
-    return res.status(400).send('Harap unggah minimal 1 file gambar (JPG/PNG).');
+    return res.status(400).send('Harap unggah minimal 1 file gambar (JPG/JPEG/PNG).');
   }
 
   const imageFiles = req.files.filter(file =>
-    file.mimetype === 'image/jpeg' || file.mimetype === 'image/png'
+    file.mimetype === 'image/jpg' || file.mimetype === 'image/jpeg' || file.mimetype === 'image/png'
   );
 
   if (imageFiles.length === 0) {
     req.files.forEach(file => safeUnlink(file.path));
-    return res.status(400).send('Tidak ada file JPG atau PNG yang valid ditemukan.');
+    return res.status(400).send('Tidak ada file JPG/JPEG/PNG yang valid ditemukan.');
   }
 
   const cleanup = () => {
@@ -312,9 +309,8 @@ app.post('/api/convert-to-pdf', upload.array('files'), (req, res) => {
     doc.pipe(res);
 
     for (const file of imageFiles) {
-      doc.addPage();
-
-      doc.image(file.path, {
+      doc.addPage({ margin: 0 });
+      doc.image(file.path, 0, 0, {
         fit: [doc.page.width, doc.page.height],
         align: 'center',
         valign: 'center'
@@ -361,87 +357,218 @@ app.post('/api/convert-office-to-pdf', upload.single('files'), async (req, res) 
 });
 
 app.post('/api/pdf-to-word', upload.single('files'), async (req, res) => {
+  console.log('Menerima permintaan untuk konversi PDF ke Word...');
   if (!req.file) return res.status(400).send('Harap unggah 1 file PDF.');
 
-  const cleanup = () => { if (req.file) safeUnlink(req.file.path); };
+  const tempId = crypto.randomBytes(16).toString('hex');
+  const inputPath = req.file.path;
+  const outputDir = os.tmpdir();
+  const expectedOutput = path.join(outputDir, path.basename(inputPath, '.pdf') + '.docx');
+
+  const cleanup = () => {
+    safeUnlink(inputPath);
+    safeUnlink(expectedOutput);
+  };
+
   res.on('finish', cleanup);
   res.on('close', cleanup);
 
+  const loCommand = process.platform === 'win32' ? 'soffice' : 'libreoffice';
+  let responseSent = false;
+
   try {
-    const fileBuffer = await fsPromises.readFile(req.file.path);
-    libre.convert(fileBuffer, '.docx', undefined, (err, done) => {
-      if (err) {
-        console.error('LibreOffice Error (PDF to Word):', err);
-        if (!res.headersSent) return res.status(500).send('Gagal mengonversi ke Word.');
-      }
-      if (!res.headersSent) {
-        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-        res.setHeader('Content-Disposition', 'attachment; filename=Hasil-Ke-Word.docx');
-        res.send(done);
-      }
+    const args = [
+      '--headless',
+      '--infilter=writer_pdf_import',
+      '--convert-to', 'docx',
+      '--outdir', normalizePath(outputDir),
+      normalizePath(inputPath)
+    ];
+
+    const loProcess = spawn(loCommand, args);
+    let stderr = '';
+
+    loProcess.stderr.on('data', (data) => {
+      stderr += data.toString();
     });
+
+    loProcess.on('close', async (code) => {
+      if (responseSent) return;
+      responseSent = true;
+
+      if (code !== 0) {
+        console.error('LibreOffice Error:', stderr);
+        return res.status(500).send('Gagal konversi PDF ke Word. Pastikan LibreOffice terinstal.');
+      }
+
+      if (!fs.existsSync(expectedOutput)) {
+        return res.status(500).send('File output tidak ditemukan.');
+      }
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      res.setHeader('Content-Disposition', 'attachment; filename=Hasil-Ke-Word.docx');
+
+      const readStream = fs.createReadStream(expectedOutput);
+      readStream.pipe(res);
+
+      readStream.on('end', () => console.log('PDF ke Word berhasil.'));
+      readStream.on('error', (err) => {
+        console.error('Stream Error:', err);
+        if (!res.headersSent) res.status(500).send('Gagal mengirim file.');
+      });
+    });
+
+    loProcess.on('error', (err) => {
+      if (responseSent) return;
+      responseSent = true;
+      console.error('LibreOffice tidak ditemukan:', err);
+      res.status(500).send('LibreOffice tidak terinstal di server.');
+    });
+
   } catch (error) {
-    console.error('Error reading file for LibreOffice:', error);
-    if (!res.headersSent) res.status(500).send('Terjadi kesalahan saat memproses file.');
+    console.error('Error converting PDF to Word:', error);
+    if (!responseSent) res.status(500).send('Gagal mengonversi PDF ke Word.');
   }
 });
 
 app.post('/api/pdf-to-excel', upload.single('files'), async (req, res) => {
+  console.log('Menerima permintaan konversi PDF ke Excel (Tabula Direct Execute)...');
+
   if (!req.file) return res.status(400).send('Harap unggah 1 file PDF.');
 
-  const cleanup = () => { if (req.file) safeUnlink(req.file.path); };
+  const inputPath = req.file.path;
+  const outputDir = os.tmpdir();
+  const tempId = crypto.randomBytes(8).toString('hex');
+  const csvOutput = path.join(outputDir, `${tempId}.csv`);
+  const excelOutput = path.join(outputDir, `${tempId}.xlsx`);
+
+  const cleanup = () => {
+    safeUnlink(inputPath);
+    safeUnlink(csvOutput);
+    safeUnlink(excelOutput);
+  };
   res.on('finish', cleanup);
   res.on('close', cleanup);
 
   try {
-    const fileBuffer = await fsPromises.readFile(req.file.path);
-    libre.convert(fileBuffer, '.xlsx', undefined, (err, done) => {
-      if (err) {
-        console.error('LibreOffice Error (PDF to Excel):', err);
-        if (!res.headersSent) return res.status(500).send('Gagal mengonversi ke Excel.');
+    const tabulaJarPath = path.join(__dirname, 'node_modules', 'tabula-js', 'lib', 'tabula-java.jar');
+    const command = `java -jar "${tabulaJarPath}" -p all -f CSV -o "${csvOutput}" "${inputPath}"`;
+
+    exec(command, (error, stdout, stderr) => {
+      if (!fs.existsSync(csvOutput)) {
+        console.error('Tabula gagal mengekstrak tabel:', stderr || error);
+        return res.status(500).send('Gagal mengekstrak teks. Pastikan dokumen PDF bukan gambar hasil scan.');
       }
-      if (!res.headersSent) {
+
+      try {
+        const csvData = fs.readFileSync(csvOutput, 'utf8');
+
+        if (!csvData || csvData.trim() === '') {
+          return res.status(400).send('Tidak ada tabel yang terdeteksi di dalam dokumen ini.');
+        }
+
+        const workbook = xlsx.read(csvData, { type: 'string' });
+        xlsx.writeFile(workbook, excelOutput);
+
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.setHeader('Content-Disposition', 'attachment; filename=Hasil-Ke-Excel.xlsx');
-        res.send(done);
+
+        const readStream = fs.createReadStream(excelOutput);
+        readStream.pipe(res);
+
+        readStream.on('end', () => console.log('PDF ke Excel berhasil dikirim!'));
+        readStream.on('error', (err) => {
+          console.error('Stream Error:', err);
+          if (!res.headersSent) res.status(500).send('Gagal mengirim file Excel.');
+        });
+
+      } catch (excelError) {
+        console.error('Error saat merakit Excel:', excelError);
+        if (!res.headersSent) res.status(500).send('Gagal merakit data menjadi file Excel.');
       }
     });
-  } catch (error) {
-    console.error('Error reading file for LibreOffice:', error);
-    if (!res.headersSent) res.status(500).send('Terjadi kesalahan saat memproses file.');
+
+  } catch (sysError) {
+    console.error('Sistem Error:', sysError);
+    if (!res.headersSent) res.status(500).send('Terjadi kesalahan pada server saat memproses file.');
   }
 });
 
 app.post('/api/pdf-to-pptx', upload.single('files'), async (req, res) => {
+  console.log('Menerima permintaan untuk konversi PDF ke PowerPoint...');
+
   if (!req.file) return res.status(400).send('Harap unggah 1 file PDF.');
 
-  const cleanup = () => { if (req.file) safeUnlink(req.file.path); };
+  const tempId = crypto.randomBytes(16).toString('hex');
+  const inputPath = req.file.path;
+  const outputDir = os.tmpdir();
+  const expectedOutput = path.join(outputDir, path.basename(inputPath, '.pdf') + '.pptx');
+
+  const cleanup = () => {
+    safeUnlink(inputPath);
+    safeUnlink(expectedOutput);
+  };
+
   res.on('finish', cleanup);
   res.on('close', cleanup);
 
+  const loCommand = process.platform === 'win32' ? 'soffice' : 'libreoffice';
+  let responseSent = false;
+
   try {
-    const fileBuffer = await fsPromises.readFile(req.file.path);
-    libre.convert(fileBuffer, '.pptx', undefined, (err, done) => {
-      if (err) {
-        console.error('LibreOffice Error (PDF to PPTX):', err);
-        if (!res.headersSent) return res.status(500).send('Gagal mengonversi ke PowerPoint.');
-      }
-      if (!res.headersSent) {
-        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.presentationml.presentation');
-        res.setHeader('Content-Disposition', 'attachment; filename=Hasil-Ke-PowerPoint.pptx');
-        res.send(done);
-      }
+    const args = [
+      '--headless',
+      '--infilter=impress_pdf_import',
+      '--convert-to', 'pptx',
+      '--outdir', normalizePath(outputDir),
+      normalizePath(inputPath)
+    ];
+
+    const loProcess = spawn(loCommand, args);
+    let stderr = '';
+
+    loProcess.stderr.on('data', (data) => {
+      stderr += data.toString();
     });
+
+    loProcess.on('close', async (code) => {
+      if (responseSent) return;
+      responseSent = true;
+      if (code !== 0) {
+        console.error('LibreOffice Error:', stderr);
+        return res.status(500).send('Gagal konversi PDF ke PowerPoint. Pastikan LibreOffice terinstal.');
+      }
+
+      if (!fs.existsSync(expectedOutput)) {
+        return res.status(500).send('File output tidak ditemukan.');
+      }
+
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.presentationml.presentation');
+      res.setHeader('Content-Disposition', 'attachment; filename=Hasil-Ke-PowerPoint.pptx');
+
+      const readStream = fs.createReadStream(expectedOutput);
+      readStream.pipe(res);
+
+      readStream.on('end', () => console.log('PDF ke PowerPoint berhasil.'));
+      readStream.on('error', (err) => {
+        console.error('Stream Error:', err);
+        if (!res.headersSent) res.status(500).send('Gagal mengirim file.');
+      });
+    });
+
+    loProcess.on('error', (err) => {
+      if (responseSent) return;
+      responseSent = true;
+      console.error('LibreOffice tidak ditemukan:', err);
+      res.status(500).send('LibreOffice tidak terinstal di server.');
+    });
+
   } catch (error) {
-    console.error('Error reading file for LibreOffice:', error);
-    if (!res.headersSent) res.status(500).send('Terjadi kesalahan saat memproses file.');
+    console.error('Error converting PDF to PowerPoint:', error);
+    if (!responseSent) res.status(500).send('Gagal mengonversi PDF ke PowerPoint.');
   }
 });
 
-
-// ========================================================================
-// ENDPOINT CONVERT FROM PDF
-// ========================================================================
 app.post('/api/convert-from-pdf', upload.single('files'), async (req, res) => {
   console.log('Menerima permintaan untuk konversi PDF ke JPG...');
 
@@ -562,9 +689,6 @@ app.post('/api/convert-from-pdf', upload.single('files'), async (req, res) => {
   }
 });
 
-// ========================================================================
-// ENDPOINT ROTATE PDF
-// ========================================================================
 app.post('/api/rotate-pdf', upload.single('files'), async (req, res) => {
   console.log('Menerima permintaan untuk memutar PDF...');
 
@@ -614,150 +738,202 @@ app.post('/api/rotate-pdf', upload.single('files'), async (req, res) => {
   }
 });
 
-app.post('/api/edit-pdf', upload.single('files'), async (req, res) => {
-  if (!req.file) return res.status(400).send('Harap unggah file PDF yang akan diedit.');
+app.post('/api/lock-pdf', upload.single('files'), async (req, res) => {
+  console.log('Menerima permintaan untuk mengunci PDF...');
+  if (!req.file) return res.status(400).send('Harap unggah 1 file PDF.');
 
-  const cleanup = () => { if (req.file) safeUnlink(req.file.path); };
+  const password = req.body.password;
+  if (!password || password.trim() === '') {
+    safeUnlink(req.file.path);
+    return res.status(400).send('Password tidak boleh kosong.');
+  }
+
+  const tempId = crypto.randomBytes(16).toString('hex');
+  const inputPath = req.file.path;
+  const outputPath = path.join(os.tmpdir(), `locked-${tempId}.pdf`);
+
+  const cleanup = () => {
+    safeUnlink(inputPath);
+    safeUnlink(outputPath);
+  };
+
   res.on('finish', cleanup);
   res.on('close', cleanup);
 
   try {
-    const fileBuffer = await fsPromises.readFile(req.file.path);
-    const pdfDoc = await PDFDocument.load(fileBuffer);
-    let elements = [];
-    try {
-      elements = JSON.parse(req.body.elements || '[]');
-    } catch (e) {
-      console.error('JSON Parse Error di /api/edit-pdf:', e);
-      return res.status(400).send('Format elemen tidak valid.');
-    }
-    const pages = pdfDoc.getPages();
-    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-    elements.forEach(el => {
-      const pageIndex = parseInt(el.pageIndex, 10) || 0;
-      const x = parseFloat(el.x) || 50;
-      const y = parseFloat(el.y) || 50;
-      const size = parseFloat(el.size) || 12;
-      const text = String(el.text || '');
+    const randomSuffix = crypto.randomBytes(4).toString('hex');
+    const ownerPassword = password + '_' + randomSuffix;
 
-      if (pageIndex < pages.length && pageIndex >= 0 && text) {
-        const page = pages[pageIndex];
-        const { width, height } = page.getSize();
+    const args = [
+      normalizePath(inputPath),
+      'output',
+      normalizePath(outputPath),
+      'user_pw', password,
+      'owner_pw', ownerPassword,
+      'allow', 'printing'
+    ];
 
-        // Bounds check - clamp coordinates to page dimensions
-        const safeX = Math.max(0, Math.min(x, width - 50));
-        const safeY = Math.max(0, Math.min(y, height - 20));
+    const pdftkProcess = spawn('pdftk', args);
+    let errorOutput = '';
 
-        page.drawText(text, {
-          x: safeX,
-          y: page.getHeight() - safeY,
-          size: size,
-          font: font,
-          color: rgb(0, 0, 0),
-        });
+    pdftkProcess.stderr.on('data', (data) => {
+      errorOutput += data.toString();
+    });
+
+    pdftkProcess.on('close', (code) => {
+      if (code !== 0) {
+        console.error('PDFtk Error:', errorOutput);
+        if (!res.headersSent) {
+          return res.status(500).send('Gagal mengunci PDF. Pastikan file tidak rusak.');
+        }
+        return;
+      }
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'attachment; filename=Hasil-Terkunci-PDFTools.pdf');
+
+      const readStream = fs.createReadStream(outputPath);
+      readStream.pipe(res);
+      readStream.on('end', () => console.log('PDF berhasil dikunci.'));
+      readStream.on('error', (err) => {
+        console.error('Stream Error:', err);
+        if (!res.headersSent) res.status(500).send('Gagal mengirim file.');
+      });
+    });
+
+    pdftkProcess.on('error', (err) => {
+      console.error('Gagal memanggil pdftk:', err);
+      if (!res.headersSent) {
+        res.status(500).send('Aplikasi PDFtk belum terinstal atau tidak ada di PATH.');
       }
     });
-    const editedPdfBytes = await pdfDoc.save();
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'attachment; filename=Hasil-Edit.pdf');
-    res.send(Buffer.from(editedPdfBytes));
+
   } catch (error) {
-    console.error('Error editing PDF:', error);
+    console.error('Error saat mengunci PDF:', error);
     if (!res.headersSent) {
-      res.status(500).send('Gagal mengedit PDF.');
+      res.status(500).send('Terjadi kesalahan internal server.');
     }
   }
 });
 
-
-
-// ========================================================================
-// ENDPOINT UNLOCK PDF
-// ========================================================================
 app.post('/api/unlock-pdf', upload.single('files'), async (req, res) => {
-  console.log('Menerima permintaan untuk buka kunci PDF...');
+  console.log('Menerima permintaan untuk membuka kunci PDF...');
 
   if (!req.file) {
-    return res.status(400).send('Harap unggah file PDF.');
+    return res.status(400).send('Harap unggah 1 file PDF.');
   }
 
-  const cleanup = () => { if (req.file) safeUnlink(req.file.path); };
+  const password = req.body.password;
+  if (!password || password.trim() === '') {
+    safeUnlink(req.file.path);
+    return res.status(400).send('Password tidak boleh kosong.');
+  }
+
+  const tempId = crypto.randomBytes(16).toString('hex');
+  const inputPath = req.file.path;
+  const outputPath = path.join(os.tmpdir(), `unlocked-${tempId}.pdf`);
+  const gsCommand = process.platform === 'win32' ? 'gswin64c' : 'gs';
+
+  let responseSent = false;
+
+  const cleanup = () => {
+    safeUnlink(inputPath);
+    safeUnlink(outputPath);
+  };
+
   res.on('finish', cleanup);
   res.on('close', cleanup);
 
   try {
-    const fileBuffer = await fsPromises.readFile(req.file.path);
-    const pdfDoc = await PDFDocument.load(fileBuffer, {
-      password: req.body.password || '',
+    const args = [
+      `-sPDFPassword=${password}`,
+      '-sDEVICE=pdfwrite',
+      '-dNOPAUSE',
+      '-dBATCH',
+      '-dQUIET',
+      `-sOutputFile=${normalizePath(outputPath)}`,
+      normalizePath(inputPath)
+    ];
+
+    const gsProcess = spawn(gsCommand, args);
+    let errorOutput = '';
+
+    gsProcess.stderr.on('data', (data) => {
+      errorOutput += data.toString();
     });
 
-    const unlockedPdfBytes = await pdfDoc.save();
+    gsProcess.on('close', (code) => {
+      if (responseSent) return;
+      responseSent = true;
 
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'attachment; filename=Hasil-Buka-Kunci.pdf');
-    res.send(Buffer.from(unlockedPdfBytes));
+      if (code !== 0) {
+        console.error('Ghostscript Error:', errorOutput);
+        return res.status(400).send('Password salah, file rusak, atau file tidak terenkripsi.');
+      }
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'attachment; filename=Hasil-Terbuka-PDFTools.pdf');
+
+      const readStream = fs.createReadStream(outputPath);
+      readStream.pipe(res);
+      readStream.on('end', () => console.log('PDF berhasil dibuka kuncinya dengan Ghostscript.'));
+      readStream.on('error', (err) => {
+        console.error('Stream Error:', err);
+        if (!res.headersSent) res.status(500).send('Gagal mengirim file ke browser.');
+      });
+    });
+
+    gsProcess.on('error', (err) => {
+      if (responseSent) return;
+      responseSent = true;
+      console.error('Gagal menjalankan Ghostscript:', err);
+      res.status(500).send('Perintah Ghostscript tidak ditemukan di server.');
+    });
 
   } catch (error) {
-    console.error('Error saat buka kunci PDF:', error);
-    if (!res.headersSent) {
-      res.status(500).send('Gagal membuka kunci. Password mungkin salah.');
+    console.error('Error saat memproses unlock PDF:', error);
+    if (!responseSent) {
+      res.status(500).send('Terjadi kesalahan internal server.');
     }
   }
 });
 
-// ========================================================================
-// ENDPOINT SIGN PDF
-// ========================================================================
 app.post('/api/sign-pdf', upload.single('files'), async (req, res) => {
-  console.log('Menerima permintaan untuk tanda tangan PDF...');
-
-  if (!req.file || !req.body.signature) {
-    if (req.file) safeUnlink(req.file.path);
-    return res.status(400).send('File dan teks tanda tangan diperlukan.');
-  }
-
-  const cleanup = () => { if (req.file) safeUnlink(req.file.path); };
-  res.on('finish', cleanup);
-  res.on('close', cleanup);
-
   try {
+    const { posX, posY, previewWidth, previewHeight, signature } = req.body;
     const fileBuffer = await fsPromises.readFile(req.file.path);
     const pdfDoc = await PDFDocument.load(fileBuffer);
-    const pages = pdfDoc.getPages();
-    const firstPage = pages[0];
+    const firstPage = pdfDoc.getPages()[0];
     const { width, height } = firstPage.getSize();
-    const font = await pdfDoc.embedFont(StandardFonts.TimesRomanItalic);
+    const ratioX = width / parseFloat(previewWidth);
+    const ratioY = height / parseFloat(previewHeight);
+    const finalX = parseFloat(posX) * ratioX;
+    const finalY = height - (parseFloat(posY) * ratioY);
+    const signatureImageBytes = Buffer.from(signature.split(',')[1], 'base64');
+    const signatureImage = await pdfDoc.embedPng(signatureImageBytes);
+    const sigDims = signatureImage.scale(0.5);
 
-    firstPage.drawText(req.body.signature, {
-      x: width - 200,
-      y: 50,
-      size: 30,
-      font: font,
-      color: rgb(0, 0, 0.5),
+    firstPage.drawImage(signatureImage, {
+      x: finalX - (sigDims.width / 2),
+      y: finalY - (sigDims.height / 2),
+      width: sigDims.width,
+      height: sigDims.height,
     });
 
     const signedPdfBytes = await pdfDoc.save();
-
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'attachment; filename=Hasil-Tanda-Tangan.pdf');
     res.send(Buffer.from(signedPdfBytes));
-
   } catch (error) {
-    console.error('Error saat tanda tangan PDF:', error);
-    if (!res.headersSent) {
-      res.status(500).send('Gagal membubuhkan tanda tangan.');
-    }
+    console.error(error);
+    res.status(500).send('Gagal.');
   }
 });
 
-// ========================================================================
-// ENDPOINT OCR PDF
-// ========================================================================
 app.post('/api/ocr-pdf', upload.single('files'), async (req, res) => {
   console.log('Menerima permintaan untuk OCR PDF dengan Gemini 3.1 Pro...');
 
   if (!req.file) {
-    return res.status(400).send('Harap unggah file PDF.');
+    return res.status(400).json({ message: 'Harap unggah file PDF.' });
   }
 
   const cleanup = () => { if (req.file) safeUnlink(req.file.path); };
@@ -768,12 +944,17 @@ app.post('/api/ocr-pdf', upload.single('files'), async (req, res) => {
     const fileBuffer = await fsPromises.readFile(req.file.path);
 
     if (fileBuffer.length > 20 * 1024 * 1024) {
-      return res.status(400).send('File terlalu besar untuk diproses AI. Maksimal 20MB.');
+      return res.status(400).json({ message: 'File terlalu besar untuk diproses AI. Maksimal 20MB.' });
     }
 
     const model = genAI.getGenerativeModel({ model: "gemini-3.1-pro-preview" });
 
-    const prompt = "Tolong lakukan OCR pada dokumen PDF ini. Ekstrak semua teks secara akurat, pertahankan urutan dan formatnya sebaik mungkin. Berikan hasilnya hanya berupa teks yang diekstrak.";
+    const prompt = [
+      "Tolong lakukan OCR pada dokumen PDF ini.",
+      "Ekstrak semua teks secara akurat dan pertahankan urutan bacanya.",
+      "Format hasil sebagai Markdown yang rapi: gunakan heading, paragraf, bullet list, atau tabel Markdown jika struktur dokumen mendukung.",
+      "Berikan hanya hasil OCR dalam Markdown, tanpa penjelasan tambahan."
+    ].join(" ");
 
     const result = await model.generateContent([
       prompt,
@@ -786,102 +967,23 @@ app.post('/api/ocr-pdf', upload.single('files'), async (req, res) => {
     ]);
 
     const response = await result.response;
-    const text = response.text();
+    const markdown = response.text();
 
-    res.setHeader('Content-Type', 'text/plain');
-    res.setHeader('Content-Disposition', 'attachment; filename=Hasil-OCR.txt');
-    res.send(text);
+    res.json({
+      type: 'ocr',
+      markdown
+    });
 
     console.log('OCR AI berhasil diproses dan dikirim.');
 
   } catch (error) {
     console.error('Error saat OCR AI:', error);
     if (!res.headersSent) {
-      res.status(500).send('Gagal memproses OCR dengan AI. Pastikan file tidak terlalu besar.');
+      res.status(500).json({ message: 'Gagal memproses OCR dengan AI. Pastikan file tidak terlalu besar.' });
     }
   }
 });
 
-// ========================================================================
-// ENDPOINT SCAN TO PDF
-// ========================================================================
-app.post('/api/scan-to-pdf', upload.array('files'), (req, res) => {
-  console.log('Menerima permintaan untuk Scan Gambar ke PDF...');
-
-  if (!req.files || req.files.length === 0) {
-    return res.status(400).send('Harap unggah minimal 1 file gambar hasil scan.');
-  }
-
-  const cleanup = () => {
-    req.files.forEach(file => safeUnlink(file.path));
-  };
-  res.on('finish', cleanup);
-  res.on('close', cleanup);
-
-  try {
-    const doc = new PDFKitDocument({ autoFirstPage: false });
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'attachment; filename=Hasil-Scan.pdf');
-    doc.pipe(res);
-
-    for (const file of req.files) {
-      doc.addPage();
-      doc.image(file.path, {
-        fit: [doc.page.width, doc.page.height],
-        align: 'center',
-        valign: 'center'
-      });
-    }
-    doc.end();
-    console.log('Scan berhasil dikonversi ke PDF.');
-  } catch (error) {
-    console.error('Error saat scan to PDF:', error);
-    if (!res.headersSent) {
-      res.status(500).send('Gagal memproses scan ke PDF.');
-    } else {
-      res.end();
-    }
-  }
-});
-
-// ========================================================================
-// ENDPOINT HTML TO PDF
-// ========================================================================
-app.post('/api/html-to-pdf', upload.array('files'), async (req, res) => {
-  console.log('Menerima permintaan untuk HTML ke PDF...');
-
-  if (!req.files || req.files.length === 0) {
-    return res.status(400).send('Harap unggah minimal 1 file HTML.');
-  }
-
-  const cleanup = () => {
-    req.files.forEach(file => safeUnlink(file.path));
-  };
-  res.on('finish', cleanup);
-  res.on('close', cleanup);
-
-  try {
-    const fileBuffer = await fsPromises.readFile(req.files[0].path);
-    libre.convert(fileBuffer, '.pdf', undefined, (err, done) => {
-      if (err) {
-        console.error('LibreOffice Error (HTML to PDF):', err);
-        if (!res.headersSent) return res.status(500).send('Gagal mengonversi HTML ke PDF.');
-      }
-      if (!res.headersSent) {
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', 'attachment; filename=Hasil-HTML.pdf');
-        res.send(done);
-      }
-    });
-  } catch (error) {
-    console.error('Error processing HTML to PDF:', error);
-    if (!res.headersSent) res.status(500).send('Terjadi kesalahan saat memproses file.');
-  }
-});
-
-// ========================================================================
-// ENDPOINT PDF TO PDF/A
-// ========================================================================
 app.post('/api/pdf-to-pdfa', upload.single('files'), async (req, res) => {
   console.log('Menerima permintaan untuk Konversi ke PDF/A...');
 
@@ -953,15 +1055,11 @@ app.post('/api/pdf-to-pdfa', upload.single('files'), async (req, res) => {
   }
 });
 
-
-// ========================================================================
-// ENDPOINT AI SUMMARIZER
-// ========================================================================
 app.post('/api/ai-summarize', upload.single('files'), async (req, res) => {
   console.log('Menerima permintaan untuk Ringkasan AI...');
 
   if (!req.file) {
-    return res.status(400).send('Harap unggah 1 file PDF.');
+    return res.status(400).json({ message: 'Harap unggah 1 file PDF.' });
   }
 
   const cleanup = () => { if (req.file) safeUnlink(req.file.path); };
@@ -969,18 +1067,23 @@ app.post('/api/ai-summarize', upload.single('files'), async (req, res) => {
   res.on('close', cleanup);
 
   const summaryLength = req.body.summaryLength || 'medium';
-  let prompt = "Tolong buatkan ringkasan dari dokumen PDF ini dalam Bahasa Indonesia. ";
+  let prompt = [
+    "Tolong buatkan ringkasan dari dokumen PDF ini dalam Bahasa Indonesia.",
+    "Format jawaban sebagai Markdown yang rapi.",
+    "Gunakan struktur: # Ringkasan, ## Poin Penting, dan ## Detail Ringkasan.",
+    "Gunakan bullet list untuk poin penting."
+  ].join(" ");
 
-  if (summaryLength === 'short') prompt += "Buat ringkasan yang singkat (1-2 paragraf).";
-  else if (summaryLength === 'long') prompt += "Buat ringkasan yang detail dan panjang.";
-  else prompt += "Buat ringkasan dengan panjang sedang (3-4 paragraf).";
+  if (summaryLength === 'short') prompt += " Buat ringkasan yang singkat (1-2 paragraf).";
+  else if (summaryLength === 'long') prompt += " Buat ringkasan yang detail dan panjang.";
+  else prompt += " Buat ringkasan dengan panjang sedang (3-4 paragraf).";
 
   try {
     const fileBuffer = await fsPromises.readFile(req.file.path);
     if (fileBuffer.length > 20 * 1024 * 1024) {
-      return res.status(400).send('File terlalu besar untuk diproses AI. Maksimal 20MB.');
+      return res.status(400).json({ message: 'File terlalu besar untuk diproses AI. Maksimal 20MB.' });
     }
-    const data = await pdf(fileBuffer);
+    const data = await parsePdfText(fileBuffer);
     let text = data.text;
 
     const model = genAI.getGenerativeModel({ model: "gemini-3.1-pro-preview" });
@@ -1002,55 +1105,54 @@ app.post('/api/ai-summarize', upload.single('files'), async (req, res) => {
     }
 
     const response = await result.response;
-    const summary = response.text();
+    const markdown = response.text();
 
-    res.setHeader('Content-Type', 'text/plain');
-    res.setHeader('Content-Disposition', 'attachment; filename=Hasil-Ringkasan-AI.txt');
-    res.send(summary);
+    res.json({
+      type: 'summary',
+      markdown
+    });
 
     console.log('Ringkasan AI berhasil dibuat dan dikirim.');
 
   } catch (error) {
     console.error('Error saat membuat ringkasan AI:', error);
     if (!res.headersSent) {
-      res.status(500).send('Terjadi kesalahan di server saat memproses AI.');
+      res.status(500).json({ message: 'Terjadi kesalahan di server saat memproses AI.' });
     }
   }
 });
 
-// ========================================================================
-// ENDPOINT ORGANIZE PDF
-// ========================================================================
-app.post('/api/organize-pdf', upload.array('files'), async (req, res) => {
-  console.log('Menerima permintaan untuk mengatur ulang PDF...');
+app.post('/api/organize-pdf', upload.single('file'), async (req, res) => {
+  console.log('Menerima permintaan untuk mengatur ulang halaman PDF...');
 
-  if (!req.files || req.files.length === 0) {
-    return res.status(400).send('Harap unggah minimal 1 file PDF.');
+  if (!req.file) {
+    return res.status(400).send('Harap unggah 1 file PDF.');
+  }
+
+  if (!req.body.pageOrder) {
+    return res.status(400).send('Urutan halaman (pageOrder) tidak ditemukan.');
   }
 
   const cleanup = () => {
-    req.files.forEach(file => safeUnlink(file.path));
+    safeUnlink(req.file.path);
   };
   res.on('finish', cleanup);
   res.on('close', cleanup);
 
   try {
+    const pageOrder = JSON.parse(req.body.pageOrder);
+    const fileBuffer = await fsPromises.readFile(req.file.path);
+    const pdfDoc = await PDFDocument.load(fileBuffer);
     const organizedPdf = await PDFDocument.create();
-
-    for (const file of req.files) {
-      const fileBuffer = await fsPromises.readFile(file.path);
-      const pdfDoc = await PDFDocument.load(fileBuffer);
-      const copiedPages = await organizedPdf.copyPages(pdfDoc, pdfDoc.getPageIndices());
-      copiedPages.forEach((page) => organizedPdf.addPage(page));
-    }
-
+    const copiedPages = await organizedPdf.copyPages(pdfDoc, pageOrder);
+    copiedPages.forEach((page) => organizedPdf.addPage(page));
     const organizedPdfBytes = await organizedPdf.save();
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'attachment; filename=Hasil-Atur-PDFTools.pdf');
     res.send(Buffer.from(organizedPdfBytes));
 
-    console.log('PDF berhasil diatur dan dikirim.');
+    console.log('Halaman PDF berhasil diatur ulang dan dikirim.');
 
   } catch (error) {
     console.error('Error saat mengatur PDF:', error);
@@ -1060,47 +1162,11 @@ app.post('/api/organize-pdf', upload.array('files'), async (req, res) => {
   }
 });
 
-// ========================================================================
-// ENDPOINT REPAIR PDF
-// ========================================================================
-app.post('/api/repair-pdf', upload.single('files'), async (req, res) => {
-  console.log('Menerima permintaan untuk memperbaiki PDF...');
-
-  if (!req.file) {
-    return res.status(400).send('Harap unggah file PDF.');
-  }
-
-  const cleanup = () => { if (req.file) safeUnlink(req.file.path); };
-  res.on('finish', cleanup);
-  res.on('close', cleanup);
-
-  try {
-    const fileBuffer = await fsPromises.readFile(req.file.path);
-    const pdfDoc = await PDFDocument.load(fileBuffer, { ignoreEncryption: true });
-    const repairedBytes = await pdfDoc.save();
-
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'attachment; filename=Hasil-Perbaiki-PDFTools.pdf');
-    res.send(Buffer.from(repairedBytes));
-
-    console.log('PDF berhasil diperbaiki dan dikirim.');
-
-  } catch (error) {
-    console.error('Error saat memperbaiki PDF:', error);
-    if (!res.headersSent) {
-      res.status(500).send('Gagal memperbaiki PDF. Kerusakan mungkin terlalu parah.');
-    }
-  }
-});
-
-// ========================================================================
-// ENDPOINT AI TRANSLATOR
-// ========================================================================
 app.post('/api/ai-translate', upload.single('files'), async (req, res) => {
   console.log('Menerima permintaan untuk Terjemahan AI...');
 
   if (!req.file) {
-    return res.status(400).send('Harap unggah 1 file PDF.');
+    return res.status(400).json({ message: 'Harap unggah 1 file PDF.' });
   }
 
   const cleanup = () => { if (req.file) safeUnlink(req.file.path); };
@@ -1108,14 +1174,19 @@ app.post('/api/ai-translate', upload.single('files'), async (req, res) => {
   res.on('close', cleanup);
 
   const targetLanguage = req.body.targetLanguage || 'en';
-  const prompt = `Tolong terjemahkan isi dokumen PDF ini ke bahasa dengan kode "${targetLanguage}". Pertahankan makna asli dan gaya bahasanya. Berikan hasil terjemahan saja.`;
+  const prompt = [
+    `Tolong terjemahkan isi dokumen PDF ini ke bahasa dengan kode "${targetLanguage}".`,
+    "Pertahankan makna asli, gaya bahasa, dan struktur dokumen sebaik mungkin.",
+    "Format hasil terjemahan sebagai Markdown yang rapi dengan heading, paragraf, bullet list, atau tabel Markdown jika sesuai.",
+    "Berikan hanya hasil terjemahan dalam Markdown, tanpa penjelasan tambahan."
+  ].join(" ");
 
   try {
     const fileBuffer = await fsPromises.readFile(req.file.path);
     if (fileBuffer.length > 20 * 1024 * 1024) {
-      return res.status(400).send('File terlalu besar untuk diproses AI. Maksimal 20MB.');
+      return res.status(400).json({ message: 'File terlalu besar untuk diproses AI. Maksimal 20MB.' });
     }
-    const data = await pdf(fileBuffer);
+    const data = await parsePdfText(fileBuffer);
     let text = data.text;
 
     const model = genAI.getGenerativeModel({ model: "gemini-3.1-pro-preview" });
@@ -1137,18 +1208,19 @@ app.post('/api/ai-translate', upload.single('files'), async (req, res) => {
     }
 
     const response = await result.response;
-    const translatedText = response.text();
+    const markdown = response.text();
 
-    res.setHeader('Content-Type', 'text/plain');
-    res.setHeader('Content-Disposition', 'attachment; filename=Hasil-Terjemahan-AI.txt');
-    res.send(translatedText);
+    res.json({
+      type: 'translation',
+      markdown
+    });
 
     console.log('Terjemahan AI berhasil dibuat dan dikirim.');
 
   } catch (error) {
     console.error('Error saat menerjemahkan AI:', error);
     if (!res.headersSent) {
-      res.status(500).send('Terjadi kesalahan di server saat memproses AI.');
+      res.status(500).json({ message: 'Terjadi kesalahan di server saat memproses AI.' });
     }
   }
 });

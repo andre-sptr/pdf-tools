@@ -4,26 +4,22 @@ import {
   Split,
   Minimize2,
   RotateCw,
-  Pencil,
   ArrowUpDown,
-  Wrench,
   FileInput,
   FileText,
   Table,
   Presentation,
-  Code,
-  ScanLine,
   FileCheck,
   FileOutput,
   FileType,
   FileSpreadsheet,
   Monitor,
-  Lock,
   LockOpen,
   PenTool,
   ScanSearch,
   Brain,
   Languages,
+  Lock
 } from 'lucide-react';
 
 export type ToolCategory = 'edit' | 'convert-to' | 'convert-from' | 'security' | 'ai';
@@ -101,24 +97,10 @@ export const tools: Tool[] = [
     category: 'edit',
   },
   {
-    slug: 'edit-pdf',
-    title: 'Edit PDF',
-    description: 'Tambahkan teks, anotasi, dan elemen lainnya ke dokumen PDF.',
-    icon: Pencil,
-    category: 'edit',
-  },
-  {
     slug: 'organize-pdf',
     title: 'Atur Halaman PDF',
     description: 'Susun ulang, hapus, atau atur urutan halaman PDF sesuai kebutuhan.',
     icon: ArrowUpDown,
-    category: 'edit',
-  },
-  {
-    slug: 'repair-pdf',
-    title: 'Perbaiki PDF',
-    description: 'Perbaiki file PDF yang rusak atau tidak bisa dibuka dengan mudah.',
-    icon: Wrench,
     category: 'edit',
   },
 
@@ -126,7 +108,7 @@ export const tools: Tool[] = [
   {
     slug: 'convert-to-pdf',
     title: 'Gambar ke PDF',
-    description: 'Ubah file gambar JPG/PNG menjadi format PDF berkualitas tinggi.',
+    description: 'Ubah file gambar JPG/JPEG/PNG menjadi format PDF berkualitas tinggi.',
     icon: FileInput,
     category: 'convert-to',
   },
@@ -149,20 +131,6 @@ export const tools: Tool[] = [
     title: 'PowerPoint ke PDF',
     description: 'Konversi presentasi PowerPoint (PPT/PPTX) menjadi file PDF.',
     icon: Presentation,
-    category: 'convert-to',
-  },
-  {
-    slug: 'html-to-pdf',
-    title: 'HTML ke PDF',
-    description: 'Ubah halaman web atau kode HTML menjadi dokumen PDF.',
-    icon: Code,
-    category: 'convert-to',
-  },
-  {
-    slug: 'scan-to-pdf',
-    title: 'Scan ke PDF',
-    description: 'Konversi hasil scan atau gambar menjadi PDF yang terorganisir.',
-    icon: ScanLine,
     category: 'convert-to',
   },
   {
@@ -205,9 +173,16 @@ export const tools: Tool[] = [
 
   // ===================== KEAMANAN =====================
   {
+    slug: 'lock-pdf',
+    title: 'Kunci PDF',
+    description: 'Lindungi PDF dengan password untuk mencegah akses tidak sah.',
+    icon: Lock,
+    category: 'security',
+  },
+  {
     slug: 'unlock-pdf',
     title: 'Buka Kunci PDF',
-    description: 'Hapus proteksi password dari file PDF yang terkunci.',
+    description: 'Hapus password dari PDF yang terkunci.',
     icon: LockOpen,
     category: 'security',
   },
